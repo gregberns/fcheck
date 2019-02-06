@@ -1,5 +1,38 @@
+[[test]]
+name = "test1"
+description = "Write two files and check they are the same"
+disabled = false
+timeout = 5000
+[test.input]
+type = "command"
+command = "echo \"Dogs\" > ./data/dogs.txt"
+delay = 20
+[test.output]
+type = "command"
+command = "echo \"Dogs\" > ./data/cats.txt"
+[test.validate]
+type = "command"
+command = "wdiff ./data/dogs.txt ./data/cats.txt"
+
+
+[[test]]
+name = "test2"
+disabled = false
+timeout = 5000
+[test.input]
+type = "command"
+command = "echo \"Dogs\" > ./data/dogs.txt"
+delay = 20
+[test.output]
+type = "command"
+command = "echo \"Dogss\" > ./test-data/cats.txt"
+[test.validate]
+type = "command"
+command = "wdiff ./test-data/dogs.txt ./test-data/cats.txt"
+
+
 # [[test]]
-# name = "test1"
+# name = "test3"
 # disabled = true
 # delay = 10
 # timeout = 5000
@@ -18,7 +51,7 @@
 # ]
 
 [[test]]
-name = "test2"
+name = "test4"
 disabled = true
 timeout = 5000
 [test.input]
@@ -34,7 +67,7 @@ command = "xdiff correct-output.txt output-data.txt"
 # what is success?
 
 [[test]]
-name = "test3"
+name = "test5"
 disabled = true
 timeout = 5000
 [test.input]
@@ -47,36 +80,4 @@ command = "kafkacat -b localhost:9092 -t accounts -C > ./test-data/output-data.t
 [test.validate]
 type = "command"
 command = "xdiff correct-output.txt output-data.txt"
-# what is success?
-
-[[test]]
-name = "test4"
-disabled = false
-timeout = 5000
-[test.input]
-type = "command"
-command = "echo \"Dogs\" > ./test-data/dogs.txt"
-delay = 20
-[test.output]
-type = "command"
-command = "echo \"Dogss\" > ./test-data/cats.txt"
-[test.validate]
-type = "command"
-command = "cmp ./test-data/dogs.txt ./test-data/cats.txt"
-# what is success?
-
-[[test]]
-name = "test5"
-disabled = false
-timeout = 5000
-[test.input]
-type = "command"
-command = "echo \"Dogs\" > ./test-data/dogs.txt"
-delay = 20
-[test.output]
-type = "command"
-command = "echo \"Dogss\" > ./test-data/cats.txt"
-[test.validate]
-type = "command"
-command = "cmp ./test-data/dogs.txt ./test-data/cats.txt"
 # what is success?

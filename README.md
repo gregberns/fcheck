@@ -1,5 +1,3 @@
-
-
 # fcheck - Testing Framework
 
 What would a language agnostic, integration test framework look like?
@@ -16,6 +14,37 @@ What would a language agnostic, integration test framework look like?
 * Supports various input and output sources
 * Flexible validation mechanism (JS functions)
 * Describe tests with declaritive syntax
+
+## Getting Started
+
+```bash
+docker run -v ./config/:/fcheck/config/ ./data/:/fcheck/data/  gregberns/fcheck -c ./config/config.toml -r ./data/report.json
+
+
+docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./config/config.toml -r ./data/report.json
+
+
+```
+
+
+## Contributing
+
+To run the project on the local system:
+
+```bash
+node index.js -c ./config/config.toml
+```
+
+To build the project in Docker:
+
+```bash
+docker build -t fcheck .
+```
+
+docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./config/config.toml -r ./data/report.json
+
+
+
 
 ## Scenarios
 
@@ -35,11 +64,6 @@ What would a language agnostic, integration test framework look like?
   * Read file location
   * Validate file contents
 
-
-
-cp. exec sync 
-
-- waits for command to be done
 
 
 

@@ -1,11 +1,18 @@
-FROM debian:8
+FROM node:lts-stretch
 
-# Curl
+WORKDIR /fcheck
 
-# Diff tool
+RUN apt-get update &&\
+    # Diff tool, Kafka tool
+    apt-get install -y kafkacat wdiff 
 
-# Kafka tool
-RUN apt-get install kafkacat
+COPY package.json /fcheck/
 
+RUN npm install &&\
+    mkdir /fcheck/config &&\
+    mkdir /fcheck/data
 
-CMD ["bash"]
+COPY index.js /fcheck/
+
+# CMD ["bash"]
+ENTRYPOINT ["node", "index.js"]

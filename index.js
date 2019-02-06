@@ -7,33 +7,33 @@ const fs = require('fs');
 const kafka = require('kafka-node');
 const child_process = require('child_process');
 
-console.log(process.argv)
-
 program
   .version('0.1.0')
-  .option('-t, --test-file [file]', 'File with test configuration')
+  .option('-c, --config-file [file]', 'Configuration file containing tests to be run', './config/config.toml')
+  .option('-r, --report-file [file]', 'File with test configuration', './data/report.json')
   .parse(process.argv);
 
-
-if (!program.testFile) {
+if (!program.configFile) {
   console.error('No test file provided.')
   return
 }
-let configFile = program.testFile
-console.log('TestFile location: ' + configFile);
+let configFile = program.configFile
+console.log('ConfigFile location: ' + configFile);
 
 function run(configFileLocation) {
   readFile(configFileLocation)
     .then(data => {
-      console.log(data)
+      // console.log(data)
       return parseToml(data)
     })
     .then(config => {
-      console.log(config)
-      return runTests(config.tests)
+      // console.log(config)
+      return runTests(config.test)
     })
     .then(results => {
-      console.log(results)
+      // console.log(results)
+      writeFile(program.reportFile, JSON.stringify(results,  undefined, 2))
+      console.log(`Report file written to: ${program.reportFile}`)
     })
     .catch(error => {
       console.error(error)
@@ -45,7 +45,6 @@ const parseToml = data => {
     try {
       resolve(toml.parse(data))
     } catch (e) {
-      // reject(new Error('Failed to parse config file', e))
       reject(e)
     }
   })
@@ -60,33 +59,53 @@ const readFile = (filepath) => {
   })
 }
 
-const runTests = async tests => {
-  let results = {}
-  
-  for (let testName in tests) {
-    let value = tests[testName]
+const writeFile = (filepath, contents) => {
+  return new Promise((resolve, reject) => {
+    fs.writeFile(filepath, contents, function(err) {
+      if(err) return reject(new Error(`Failed to write file: ${filepath}`, e))
+      resolve()
+    });
+  })
+}
 
-    results[testName] = await runTest(testName, value)    
-  }
-  return results
+const runTests = async tests => {
+  let promiseArray = 
+    tests.map(test  => {
+      return runTest(test.name, test)
+    })
+
+  return Promise.all(promiseArray)
 }
 
 const runTest = async (testName, config) => {
   if (config.disabled) 
-    return { result: 'disabled' }
+    return { 
+      testName,
+      result: 'disabled' 
+    }
   
   try {
-    await runCommand(config.input, config.timeout)
+    let inputResult = 
+      await runCommand(config.input, config.timeout)
 
-    await runCommand(config.output, config.timeout)
+    let outputResult =
+      await runCommand(config.output, config.timeout)
   
-    await runCommand(config.validate, config.timeout)
+    let validateResult = 
+      await runCommand(config.validate, config.timeout)
 
     return {
-      result: 'success'
+      testName,
+      result: 'success',
+      results: [
+        inputResult,
+        outputResult,
+        validateResult
+      ]
     }
   } catch (e) {
     return {
+      testName,
       result: 'failure',
       error: e
     }
@@ -96,8 +115,7 @@ const runTest = async (testName, config) => {
 const runCommand = async (config, timeout) => {
   var returnValue = null
   if (config.type === 'command') {
-    await runProcess(config.command, timeout)
-    
+    returnValue = await runProcess(config.command, timeout)
   }
   if (config.type === "file") {
     if (config.operation === "copy") {
@@ -128,6 +146,21 @@ const runCommand = async (config, timeout) => {
   }
 }
 
+const runProcess = command => {
+  return new Promise((resolve, reject) => {
+    try {
+      let buffer = child_process.execSync(command)
+      resolve(buffer)
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 const copyFile = (source, destination) => {
   return new Promise((resolve, reject) => {
     fs.copyFile(source, destination, (err) => {
@@ -137,8 +170,6 @@ const copyFile = (source, destination) => {
     });
   })
 }
-
-
 
 const getKafkaProducer = (host, topic) => {
   const client = new kafka.KafkaClient({
@@ -203,21 +234,6 @@ const readKafkaMessage = async (host, topic) => {
       reject(e)
     }
   })
-}
-
-const runProcess = command => {
-  return new Promise((resolve, reject) => {
-    try {
-      let buffer = child_process.execSync(command)
-      resolve(buffer)
-    } catch (e) {
-      reject(e)
-    }
-  })
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 run(configFile)
