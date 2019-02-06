@@ -1,0 +1,82 @@
+# [[test]]
+# name = "test1"
+# disabled = true
+# delay = 10
+# timeout = 5000
+# [test.input]
+# type = "file"
+# operation = "copy"
+# fileFrom = "./test-data/test-file1.json"
+# fileTo = "./test-data/accounts-2019-01-01.json"
+# [test.output]
+# type = "kafka"
+# kafka-host = "localhost:9092"
+# topic = "accounts"
+# validation = [
+#   "some data",
+#   "other data"
+# ]
+
+[[test]]
+name = "test2"
+disabled = true
+timeout = 5000
+[test.input]
+type = "command"
+command = "cp ./test-data/test-file1.json ./test-data/accounts-2019-01-01.json"
+delay = 20
+[test.output]
+type = "command"
+command = "kafkacat -b localhost:9092 -t mysql_users -C ./somefilename.txt > output-data.txt"
+[test.validate]
+type = "command"
+command = "xdiff correct-output.txt output-data.txt"
+# what is success?
+
+[[test]]
+name = "test3"
+disabled = true
+timeout = 5000
+[test.input]
+type = "command"
+command = "cat ./test-data/input-data.json > kafkacat -b localhost:9092 -t accounts -P"
+delay = 20
+[test.output]
+type = "command"
+command = "kafkacat -b localhost:9092 -t accounts -C > ./test-data/output-data.txt"
+[test.validate]
+type = "command"
+command = "xdiff correct-output.txt output-data.txt"
+# what is success?
+
+[[test]]
+name = "test4"
+disabled = false
+timeout = 5000
+[test.input]
+type = "command"
+command = "echo \"Dogs\" > ./test-data/dogs.txt"
+delay = 20
+[test.output]
+type = "command"
+command = "echo \"Dogss\" > ./test-data/cats.txt"
+[test.validate]
+type = "command"
+command = "cmp ./test-data/dogs.txt ./test-data/cats.txt"
+# what is success?
+
+[[test]]
+name = "test5"
+disabled = false
+timeout = 5000
+[test.input]
+type = "command"
+command = "echo \"Dogs\" > ./test-data/dogs.txt"
+delay = 20
+[test.output]
+type = "command"
+command = "echo \"Dogss\" > ./test-data/cats.txt"
+[test.validate]
+type = "command"
+command = "cmp ./test-data/dogs.txt ./test-data/cats.txt"
+# what is success?
