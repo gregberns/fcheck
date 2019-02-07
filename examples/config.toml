@@ -1,34 +1,54 @@
+# [[test]]
+# name = "test1"
+# description = "Write two files and check they are the same"
+# disabled = false
+# timeout = 5000
+# [test.input]
+# type = "command"
+# command = "echo \"Dogs\" > ./data/dogs.txt"
+# delay = 20
+# [test.output]
+# type = "command"
+# command = "echo \"Dogs\" > ./data/cats.txt"
+# [test.validate]
+# type = "command"
+# command = "wdiff ./data/dogs.txt ./data/cats.txt"
+
+
+# [[test]]
+# name = "test2"
+# disabled = false
+# timeout = 5000
+# [test.input]
+# type = "command"
+# command = "echo \"Dogs\" > ./data/dogs.txt"
+# delay = 20
+# [test.output]
+# type = "command"
+# command = "echo \"Dogss\" > ./test-data/cats.txt"
+# [test.validate]
+# type = "command"
+# command = "wdiff ./test-data/dogs.txt ./test-data/cats.txt"
+
+
 [[test]]
-name = "test1"
-description = "Write two files and check they are the same"
+name = "ping zookeeper"
+description = "ping zookeeper server"
 disabled = false
 timeout = 5000
 [test.input]
 type = "command"
-command = "echo \"Dogs\" > ./data/dogs.txt"
-delay = 20
-[test.output]
-type = "command"
-command = "echo \"Dogs\" > ./data/cats.txt"
-[test.validate]
-type = "command"
-command = "wdiff ./data/dogs.txt ./data/cats.txt"
-
-
-[[test]]
-name = "test2"
-disabled = false
+command = "nc -z zookeeper 2182 > /dev/null 2>&1"
 timeout = 5000
-[test.input]
-type = "command"
-command = "echo \"Dogs\" > ./data/dogs.txt"
 delay = 20
 [test.output]
 type = "command"
-command = "echo \"Dogss\" > ./test-data/cats.txt"
+command = "ping zookeeper"
+timeout = 5000
 [test.validate]
 type = "command"
-command = "wdiff ./test-data/dogs.txt ./test-data/cats.txt"
+command = "ping zookeeper"
+timeout = 5000
 
 
 # [[test]]

@@ -6,6 +6,8 @@ const concat = require('concat-stream');
 const fs = require('fs');
 const kafka = require('kafka-node');
 const child_process = require('child_process');
+const util = require('util')
+var StringDecoder = require('string_decoder').StringDecoder;
 
 console.log('fcheck starting')
 
@@ -34,11 +36,21 @@ function run(configFileLocation) {
     })
     .then(results => {
       console.log(results)
+      
       writeFile(program.reportFile, JSON.stringify(results,  undefined, 2))
+      // writeFile(program.reportFile, util.inspect(results))
       console.log(`Report file written to: ${program.reportFile}`)
+      let failures = results.filter(test => test.result === 'failure').length
+      if (failures === 0) {
+        process.exit(0)  
+      } else {
+        console.error(`Tests failed. Count: ${failures}`)
+        process.exit(1)
+      }
     })
     .catch(error => {
       console.error(error)
+      process.exit(2)
     })
 }
 
@@ -64,7 +76,7 @@ const readFile = (filepath) => {
 const writeFile = (filepath, contents) => {
   return new Promise((resolve, reject) => {
     fs.writeFile(filepath, contents, function(err) {
-      if(err) return reject(new Error(`Failed to write file: ${filepath}`, e))
+      if(err) return reject(new Error(`Failed to write file: ${filepath}`, err))
       resolve()
     });
   })
@@ -148,16 +160,71 @@ const runCommand = async (config, timeout) => {
   }
 }
 
-const runProcess = command => {
+const runProcess = (command, timeout) => {
   return new Promise((resolve, reject) => {
     try {
-      let buffer = child_process.execSync(command)
+      let buffer = child_process.execSync(command, {timeout})
       resolve(buffer)
     } catch (e) {
+      var err = parseProcessError(e)
       reject(e)
     }
   })
 }
+
+const parseProcessError = e => {
+  try {
+    var decoder = new StringDecoder('utf8');
+
+    let stdout = ''
+    if (e.stdout.length > 0) {
+      stdout = decoder.write(e.stdout)
+    }
+    
+    let stderr = ''
+    if (e.stderr.lenght > 0) {
+      stderr = decoder.write(e.sterr)
+    }
+
+    return { 
+      rawError: e,
+      parsedError: {
+        code: e.code,
+        //error: e.Error,
+        status: e.status,
+        output: e.output,
+        stdout: stdout,
+        stderr: stderr
+      }
+    }
+  } catch (err) {
+    console.error('Failed to process error', e, err)
+    return { 
+      rawError: e
+    }
+  }
+}
+
+// { testName: 'ping zookeeper',
+// fcheck_1     |     result: 'failure',
+// fcheck_1     |     error:
+// fcheck_1     |      { Error: Command failed: nc -z zookeeper 2181 > /dev/null 2>&1
+// fcheck_1     |          at checkExecSyncError (child_process.js:616:11)
+// fcheck_1     |          at Object.execSync (child_process.js:653:13)
+// fcheck_1     |          at Promise (/fcheck/index.js:157:34)
+// fcheck_1     |          at new Promise (<anonymous>)
+// fcheck_1     |          at runProcess (/fcheck/index.js:155:10)
+// fcheck_1     |          at runCommand (/fcheck/index.js:123:25)
+// fcheck_1     |          at runTest (/fcheck/index.js:94:13)
+// fcheck_1     |          at tests.map.test (/fcheck/index.js:79:14)
+// fcheck_1     |          at Array.map (<anonymous>)
+// fcheck_1     |          at runTests (/fcheck/index.js:78:11)
+// fcheck_1     |        status: 127,
+// fcheck_1     |        signal: null,
+// fcheck_1     |        output: [Array],
+// fcheck_1     |        pid: 17,
+// fcheck_1     |        stdout: <Buffer >,
+// fcheck_1     |        stderr: <Buffer > } } ]
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));

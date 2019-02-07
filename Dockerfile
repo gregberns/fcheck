@@ -3,16 +3,15 @@ FROM node:lts-stretch
 WORKDIR /fcheck
 
 RUN apt-get update &&\
-    # Diff tool, Kafka tool
-    apt-get install -y kafkacat wdiff
+    apt-get install -y kafkacat wdiff netcat
 
 COPY package.json /fcheck/
 
 RUN npm install &&\
     mkdir /fcheck/config &&\
-    mkdir /fcheck/data
+    mkdir /fcheck/data &&\
+    mkdir /fcheck/output
 
 COPY index.js /fcheck/
 
-# CMD ["bash"]
 ENTRYPOINT ["node", "index.js"]

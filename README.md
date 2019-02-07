@@ -36,7 +36,7 @@ docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fchec
 To run the project on the local system:
 
 ```bash
-node index.js -c ./config/config.toml
+node index.js -c ./examples/config.toml
 ```
 
 To build the project in Docker:
