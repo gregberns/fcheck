@@ -4,7 +4,7 @@ WORKDIR /fcheck
 
 RUN apt-get update &&\
     # Diff tool, Kafka tool
-    apt-get install -y kafkacat wdiff 
+    apt-get install -y kafkacat wdiff
 
 COPY package.json /fcheck/
 

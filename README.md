@@ -2,6 +2,8 @@
 
 What would a language agnostic, integration test framework look like?
 
+Maybe something like Postman / Newman(command line executor), but a tool that would execute general commands to kick off a test, check for updated values, and validate the results.
+
 ## Why
 
 ### Problem to be solved
@@ -17,15 +19,17 @@ What would a language agnostic, integration test framework look like?
 
 ## Getting Started
 
+To run an example config file:
+
 ```bash
-docker run -v ./config/:/fcheck/config/ ./data/:/fcheck/data/  gregberns/fcheck -c ./config/config.toml -r ./data/report.json
-
-
-docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./config/config.toml -r ./data/report.json
-
-
+docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./examples/config.toml -r ./data/report.json
 ```
 
+## Commands Available
+
+* Commands available in: `node:lts-stretch`, Debian `stretch`, etc
+* `kafkacat`
+* `wdiff`
 
 ## Contributing
 
@@ -41,10 +45,11 @@ To build the project in Docker:
 docker build -t fcheck .
 ```
 
-docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./config/config.toml -r ./data/report.json
+To run in docker:
 
-
-
+```
+docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./examples/config.toml -r ./data/report.json
+```
 
 ## Scenarios
 

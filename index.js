@@ -7,6 +7,8 @@ const fs = require('fs');
 const kafka = require('kafka-node');
 const child_process = require('child_process');
 
+console.log('fcheck starting')
+
 program
   .version('0.1.0')
   .option('-c, --config-file [file]', 'Configuration file containing tests to be run', './config/config.toml')
@@ -31,7 +33,7 @@ function run(configFileLocation) {
       return runTests(config.test)
     })
     .then(results => {
-      // console.log(results)
+      console.log(results)
       writeFile(program.reportFile, JSON.stringify(results,  undefined, 2))
       console.log(`Report file written to: ${program.reportFile}`)
     })
