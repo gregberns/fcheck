@@ -4,6 +4,8 @@ What would a language agnostic, integration test framework look like?
 
 Maybe something like Postman / Newman(command line executor), but a tool that would execute general commands to kick off a test, check for updated values, and validate the results.
 
+**ATTENTION** This is a v0.* version! Expect bugs and issues all around. Submitting pull requests and issues is highly encouraged!
+
 ## Why
 
 ### Problem to be solved
@@ -30,6 +32,7 @@ docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fchec
 * Commands available in: `node:lts-stretch`, Debian `stretch`, etc
 * `kafkacat`
 * `wdiff`
+* `netcat` or `nc`
 
 ## Contributing
 
@@ -69,71 +72,146 @@ docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fchec
   * Read file location
   * Validate file contents
 
+## Example
+
+Configuration file has a setup, two tests, and a teardown. The first test will fail with an error.
+
+Below is the output of running this config.
+
+The failure occurs in `test1` because `rm ./data/cats.txt` does not include `-f`, which prevents failure if the file doesn't exist.
+
+```toml
+[[setup]]
+[[setup.command]]
+command = "rm -f ./data/cats.txt && rm -f ./data/dogs.txt"
+
+[[test]]
+name = "test1"
+description = "Write two files and check they are the same"
+disabled = false
+timeout = 5000
+[[test.command]]
+command = "rm -f ./data/cats.txt && rm ./data/cats.txt && rm -f ./data/dogs.txt"
+[[test.command]]
+name = "Create Dogs file"
+command = "echo \"Dogs\" > ./data/dogs.txt"
+[[test.command]]
+name = "Create Cats file"
+command = "echo \"Dogs\" > ./data/cats.txt"
+[[test.command]]
+name = "diff"
+command = "diff ./data/dogs.txt ./data/cats.txt"
 
 
 
-# compare using... literal, file,tool
-# dump from database to csv - whole table
-# 
-# input output folder
+[[test]]
+name = "test2"
+description = "Write two files and check they are the same"
+disabled = false
+timeout = 5000
+[[test.command]]
+command = "rm -f ./data/cats.txt && rm -f ./data/dogs.txt"
+[[test.command]]
+name = "Create Dogs file"
+command = "echo \"Dogs\" > ./data/dogs.txt"
+[[test.command]]
+name = "Create Cats file"
+command = "echo \"Dogs\" > ./data/cats.txt"
+[[test.command]]
+name = "diff"
+command = "diff ./data/dogs.txt ./data/cats.txt"
 
-# assert 'a' before and 'b' after
+[[teardown]]
+[[teardown.command]]
+command = "rm -f ./data/cats.txt && rm -f ./data/dogs.txt"
+```
 
-#emit 
-see item is in the list - check for accoutn number
-then emit message
-then check that value has changed
-only 
-Then run newman...
+The output report shows:
+* The setup was successful
+* The first test failed
+* The second test was successful
+* The teardown was successful
 
-
-pro
-
-
-Account Event Producer
-_ copy file to location
-_ read messages off kafka - save to file
-_ diff files
-
-Account Filter Worker/Consumer
-_ push messages onto kafka
-_ newman run tests
-
-
-use curl and not postman
-
-
-test-data
-  test1
-    run.sh
-
-    input.txt
-    output.txt
-    config.json
-
-input - evt prod - copy file, start kafka reader
-
-toml, array of commands to run
- - output check - agains a file
-
-docker run testy -t test1 -v /test-dir:
-pass params into compose?
-
-bake in curl, kafka prod/consum
-
-
-Account
-
-
-
-Event 1 - Acct1
-Acct1 - missing from store
-Send "New Account" - Acct1 (whole payload)
-
-
-Event 2 - Acc1
-Acc1 - Exists in store
-Diff
-Send Diff
-
-
+```json
+{
+  "result": "failure",
+  "setup": {
+    "name": "Setup",
+    "result": "success",
+    "results": [
+      {
+        "commandName": "Command # 1",
+        "commandResult": "success",
+        "commandCommand": "rm -f ./data/cats.txt && rm -f ./data/dogs.txt",
+        "commandOutput": ""
+      }
+    ]
+  },
+  "tests": [
+    {
+      "name": "test1",
+      "result": "failure",
+      "results": {
+        "commandName": "Command # 1",
+        "commandResult": "failure",
+        "commandCommand": "rm -f ./data/cats.txt && rm ./data/cats.txt && rm -f ./data/dogs.txt",
+        "commandOutput": {
+          "parsedError": {
+            "status": 1,
+            "output": [
+              null,
+              "",
+              "rm: ./data/cats.txt: No such file or directory\n"
+            ],
+            "stdout": "",
+            "stderr": "rm: ./data/cats.txt: No such file or directory\n"
+          },
+          "rawError": "..."
+        }
+      }
+    },
+    {
+      "name": "test2",
+      "result": "success",
+      "results": [
+        {
+          "commandName": "Command # 1",
+          "commandResult": "success",
+          "commandCommand": "rm -f ./data/cats.txt && rm -f ./data/dogs.txt",
+          "commandOutput": ""
+        },
+        {
+          "commandName": "Create Dogs file",
+          "commandResult": "success",
+          "commandCommand": "echo \"Dogs\" > ./data/dogs.txt",
+          "commandOutput": ""
+        },
+        {
+          "commandName": "Create Cats file",
+          "commandResult": "success",
+          "commandCommand": "echo \"Dogs\" > ./data/cats.txt",
+          "commandOutput": ""
+        },
+        {
+          "commandName": "diff",
+          "commandResult": "success",
+          "commandCommand": "diff ./data/dogs.txt ./data/cats.txt",
+          "commandOutput": ""
+        }
+      ]
+    }
+  ],
+  "teardown": {
+    "name": "Teardown",
+    "result": "success",
+    "results": [
+      {
+        "commandName": "Command # 1",
+        "commandResult": "success",
+        "commandCommand": "rm -f ./data/cats.txt && rm -f ./data/dogs.txt",
+        "commandOutput": ""
+      }
+    ]
+  }
+}
+```

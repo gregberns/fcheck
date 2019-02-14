@@ -31,20 +31,22 @@ function run(configFileLocation) {
       return parseToml(data)
     })
     .then(config => {
-      // console.log(config)
-      return runTests(config.test)
+      console.log(JSON.stringify(config,  undefined, 2))
+      // return runTests(config.test)
+      return runProcesses(config)
     })
-    .then(results => {
-      console.log(results)
+    .then(async results => {
+      console.log(JSON.stringify(results,  undefined, 2))
       
-      writeFile(program.reportFile, JSON.stringify(results,  undefined, 2))
-      // writeFile(program.reportFile, util.inspect(results))
+      await writeFile(program.reportFile, JSON.stringify(results,  undefined, 2))
+      // await writeFile(program.reportFile, util.inspect(results))
+
       console.log(`Report file written to: ${program.reportFile}`)
-      let failures = results.filter(test => test.result === 'failure').length
-      if (failures === 0) {
+      
+      if (results.result === 'success') {
         process.exit(0)  
       } else {
-        console.error(`Tests failed. Count: ${failures}`)
+        console.error(`Process failed. Exit code 1`)
         process.exit(1)
       }
     })
@@ -54,47 +56,112 @@ function run(configFileLocation) {
     })
 }
 
-const parseToml = data => {
-  return new Promise((resolve, reject) => {
-    try {
-      resolve(toml.parse(data))
-    } catch (e) {
-      reject(e)
+const runProcesses = async config => {
+  let setup = await runTest("Setup", config.setup[0])
+  if (setup.result === 'failure') {
+    return {
+      result: 'failure',
+      setup,
     }
-  })
-}
+  }
+  let tests = await runTests(config.test)
+  // dont stop the tear down from running if one of the tests fail to run
+  let teardown = await runTest("Teardown", config.teardown[0])
 
-const readFile = (filepath) => {
-  return new Promise((resolve, reject) => {
-    fs.createReadStream(filepath, 'utf8')
-      .pipe(concat(function(data) {
-        resolve(data);
-      }));
-  })
-}
+  let failures = tests.filter(test => test.result === 'failure').length
+  let result = failures === 0 ? 'success' : 'failure'
 
-const writeFile = (filepath, contents) => {
-  return new Promise((resolve, reject) => {
-    fs.writeFile(filepath, contents, function(err) {
-      if(err) return reject(new Error(`Failed to write file: ${filepath}`, err))
-      resolve()
-    });
-  })
+  return {
+    result,
+    setup,
+    tests,
+    teardown,
+  }
 }
 
 const runTests = async tests => {
+  if (tests == null) return new Promise((resolve) => {resolve()})
   let promiseArray = 
-    tests.map(test  => {
-      return runTest(test.name, test)
-    })
+    tests.map((test, index)  => {
+        let testName = test.name && `Process/Test #${index+1}`
+        return runTest(test.name, test)
+      })
 
   return Promise.all(promiseArray)
 }
 
-const runTest = async (testName, config) => {
+const runTest = async (name, config) => {
   if (config.disabled) 
     return { 
-      testName,
+      name,
+      result: 'disabled' 
+    }
+  
+  let version = config.version || 2
+  if (version === 1) {
+    return await runTestV1(name, config)
+  } else if (version === 2) {
+    // console.log("------------")
+    // console.log(JSON.stringify(config,  undefined, 2))
+    return await runTestV2(name, config)
+  } else {
+    throw new Error(`Version in config not supported: ${version}. Supported: 2`)
+  }
+}
+
+const runTestV2 = async (name, test) => {
+  if (test.disabled) {
+    return { 
+      name,
+      result: 'disabled' 
+    }
+  }
+
+  let runnable = test.command
+    .map((commandObj, index) => {
+      return runProcess(commandObj.command, commandObj.timeout)
+        .then(result => {
+          let formattedResult = (result instanceof Buffer) ? result.toString() : result
+          return {
+            commandName: commandObj.name || `Command # ${index+1}`,
+            commandResult: 'success',
+            commandCommand: commandObj.command,
+            commandOutput: formattedResult,
+          }
+        })
+        .catch(error => {
+          throw {
+            commandName: commandObj.name || `Command # ${index+1}`,
+            commandResult: 'failure',
+            commandCommand: commandObj.command,
+            commandOutput: error,
+          }
+        })
+    })
+    
+  return Promise.all(runnable)
+    .then(results => {
+      // let failures = results.filter(test => test.result === 'failure').length
+      // let result = failures === 0 ? 'success' : 'failure'
+      return {
+        name,
+        result: 'success',
+        results
+      }
+    })
+    .catch(results => {
+      return {
+        name,
+        result: 'failure',
+        results
+      }
+    })
+}
+
+const runTestV1 = async (name, config) => {
+  if (config.disabled) 
+    return { 
+      name,
       result: 'disabled' 
     }
   
@@ -167,40 +234,33 @@ const runProcess = (command, timeout) => {
       resolve(buffer)
     } catch (e) {
       var err = parseProcessError(e)
-      reject(e)
+      reject(err)
     }
   })
 }
 
 const parseProcessError = e => {
   try {
-    var decoder = new StringDecoder('utf8');
-
-    let stdout = ''
-    if (e.stdout.length > 0) {
-      stdout = decoder.write(e.stdout)
-    }
-    
-    let stderr = ''
-    if (e.stderr.lenght > 0) {
-      stderr = decoder.write(e.sterr)
-    }
-
     return { 
-      rawError: e,
       parsedError: {
         code: e.code,
         //error: e.Error,
         status: e.status,
-        output: e.output,
-        stdout: stdout,
-        stderr: stderr
-      }
+        output: e.output.map(i => i && i.toString()),
+        stdout: e.stdout.toString(),
+        stderr: e.stderr.toString()
+      },
+      rawError: e,
     }
   } catch (err) {
-    console.error('Failed to process error', e, err)
+    console.error("-------------")
+    console.error('Failed to process error 1', e)
+    console.error("-------------")
+    console.error('Failed to process error 2', err)
+    console.error("-------------")
     return { 
-      rawError: e
+      rawError: e,
+      parseProcessError: err
     }
   }
 }
@@ -225,6 +285,35 @@ const parseProcessError = e => {
 // fcheck_1     |        pid: 17,
 // fcheck_1     |        stdout: <Buffer >,
 // fcheck_1     |        stderr: <Buffer > } } ]
+
+
+const parseToml = data => {
+  return new Promise((resolve, reject) => {
+    try {
+      resolve(toml.parse(data))
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+const readFile = (filepath) => {
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(filepath, 'utf8')
+      .pipe(concat(function(data) {
+        resolve(data);
+      }));
+  })
+}
+
+const writeFile = (filepath, contents) => {
+  return new Promise((resolve, reject) => {
+    fs.writeFile(filepath, contents, function(err) {
+      if (err) return reject(new Error(`Failed to write file: ${filepath}`, err))
+      resolve()
+    });
+  })
+}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));

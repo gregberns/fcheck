@@ -1,0 +1,111 @@
+
+# Benefits of Dhall
+# - file name declaration only once, then use string interpolation to fill in the blanks
+# - server names could be declared globally, so changing them would be trivial
+
+
+version = 2
+
+# {
+#   version: 2,
+#   tests: [{
+#     name: "Comparing Dogs and Cats",
+#     description: "",
+#     disabled: true,
+#     timeout: 5000,
+#     commands: [{
+#       name: "Step1",
+#       command: "echo \"Dogs\" > ./data/dogs.txt",
+#       timeout: 5000,
+#     },{
+#       command: "echo \"Dogs\" > ./data/cats.txt"
+#     },{
+#       name: "validate",
+#       command: "wdiff ./data/dogs.txt ./data/cats.txt"
+#     }]
+#   },{
+#     name: "Copy file, read stream, validate message from stream",
+#     description: "Write two files and check they are the same",
+#     commands: [{
+#       name: "Clear drop zone",
+#       command: "rm -f /drop-zone/*.*"
+#     },{
+#       name: "Drop file",
+#       command: "cp /fcheck/data/success-single-msg.json /drop-zone/account-2019-01-01.json"
+#     },{
+#       command: "sleep 250"
+#     },{
+#       name: "Read messages from Kafka",
+#       command: "kafkacat -C -b kafka:9092 -t account -p 0 -o -1 -e > /fcheck/output/success-single-msg-out.json",
+#     },{
+#       name: "Diff output",
+#       command: "wdiff -n /fcheck/data/success-single-msg-out.json /fcheck/output/success-single-msg-out.json",
+#     }]
+#   }]
+# }
+
+[[setup]]
+[[setup.command]]
+command = "rm -f ./data/cats.txt && rm -f ./data/dogs.txt"
+
+[[test]]
+name = "test1"
+description = "Write two files and check they are the same"
+disabled = false
+timeout = 5000
+[[test.command]]
+command = "rm -f ./data/cats.txt && rm ./data/cats.txt && rm -f ./data/dogs.txt"
+[[test.command]]
+name = "Create Dogs file"
+command = "echo \"Dogs\" > ./data/dogs.txt"
+[[test.command]]
+name = "Create Cats file"
+command = "echo \"Dogs\" > ./data/cats.txt"
+[[test.command]]
+name = "diff"
+command = "diff ./data/dogs.txt ./data/cats.txt"
+
+
+
+[[test]]
+name = "test2"
+description = "Write two files and check they are the same"
+disabled = false
+timeout = 5000
+[[test.command]]
+command = "rm -f ./data/cats.txt && rm -f ./data/dogs.txt"
+[[test.command]]
+name = "Create Dogs file"
+command = "echo \"Dogs\" > ./data/dogs.txt"
+[[test.command]]
+name = "Create Cats file"
+command = "echo \"Dogs\" > ./data/cats.txt"
+[[test.command]]
+name = "diff"
+command = "diff ./data/dogs.txt ./data/cats.txt"
+
+[[teardown]]
+[[teardown.command]]
+command = "rm -f ./data/cats.txt && rm -f ./data/dogs.txt"
+
+
+
+# [[test]]
+# name = "Copy file, read stream, validate message from stream"
+# description = "Write two files and check they are the same"
+# disabled = false
+# timeout = 5000
+# [[test.command]]
+# name = "Clear drop zone"
+# command = "rm -f /drop-zone/*.*"
+# [[test.command]]
+# name = "Drop file"
+# command = "cp /fcheck/data/success-single-msg.json /drop-zone/account-2019-01-01.json"
+# [[test.command]]
+# command = "sleep 250"
+# [[test.command]]
+# name = "Read messages from Kafka"
+# command = "kafkacat -C -b kafka:9092 -t account -p 0 -o -1 -e > /fcheck/output/success-single-msg-out.json"
+# [[test.command]]
+# name = "Diff output"
+# command = "wdiff -n /fcheck/data/success-single-msg-out.json /fcheck/output/success-single-msg-out.json"
