@@ -2,22 +2,41 @@
 
 What would a language agnostic, integration test framework look like?
 
-Maybe something like Postman / Newman(command line executor), but a tool that would execute general commands to kick off a test, check for updated values, and validate the results.
+Maybe something like Postman / Newman(its command line executor), but a tool that would:
+
+* Run general setup commands
+* Execute general commands to test a feature
+  * Run a command to start a process
+  * Check for updated values
+  * Validate the results
+* Run teardown commands
+
+To be as flexible as possible and not re-invent the wheel, we can leverage any local commands, so on Linux, we can run bash/sh commands: to move files, run Kafka commands, make HTTP requests with curl, or any other commands that the OS is cabable of.
+
+If the OS or Docker image doesn't have the command, then just install the command prior to running the tests!
 
 **ATTENTION** This is a v0.* version! Expect bugs and issues all around. Submitting pull requests and issues is highly encouraged!
 
-## Why
+## Why - The Problem To Be Solved
 
-### Problem to be solved
+Testing microservices can be hard, especially within the context of a distributed system. We could write a set of scripts to execute these test, but writing, debugging, but scripts can be a challenge to write and maintain.
 
-* Make HTTP request (which puts message on queue), reads Kafka queue, validates message contents
-* Copy file to location (which is picked up by esrvice), make an HTTP request, and validate response
+This project attempts to simplify this problem.
 
-### Framework Requirements
+What types of problems does this solve:
 
-* Supports various input and output sources
-* Flexible validation mechanism (JS functions)
-* Describe tests with declaritive syntax
+### Example Service: Kafka Producer
+
+Test a service that is a Kafka producer: Service reads a file, then puts a message on the queue.
+
+What would the test look like?
+
+* Setup: ensure Kafka has a the appropriate topic
+* Test:
+  * Copy file where the service can see it
+  * Sleep for 250ms
+  * Read last message from Kafka and save to output location
+  * Diff the output file with an expected result
 
 ## Getting Started
 
@@ -29,48 +48,22 @@ docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fchec
 
 ## Commands Available
 
+The fcheck Docker image has several tools built in:
+
 * Commands available in: `node:lts-stretch`, Debian `stretch`, etc
 * `kafkacat`
 * `wdiff`
 * `netcat` or `nc`
 
-## Contributing
+## Docker Support
 
-To run the project on the local system:
+Docker support is first-class, but to solve your particular problem, you may need to extend the base fcheck image with the binary's you need to use.
 
-```bash
-node index.js -c ./examples/config.toml
-```
+## Configuration
 
-To build the project in Docker:
+Currently, fcheck supports TOML files as the default configuration method.
 
-```bash
-docker build -t fcheck .
-```
-
-To run in docker:
-
-```
-docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./examples/config.toml -r ./data/report.json
-```
-
-## Scenarios
-
-* Producer with File Drop
-  * Drop file in location
-  * Wait
-  * Read queue
-  * Validate messages on queue
-* Producer with HTTP endpoint
-  * Send HTTP message
-  * Wait
-  * Read queue
-  * Validate messages on queue
-* Consumer check File
-  * Push messages to queue
-  * Wait
-  * Read file location
-  * Validate file contents
+In future implementations, we'd like to support the [Dhall configuration language](https://dhall-lang.org/). This will help reduce duplicate declaration of paths, files, commands, etc, with an aim to improve maintainability and robustness of our testing frameworks.
 
 ## Example
 
@@ -127,6 +120,7 @@ command = "rm -f ./data/cats.txt && rm -f ./data/dogs.txt"
 ```
 
 The output report shows:
+
 * The setup was successful
 * The first test failed
 * The second test was successful
@@ -214,4 +208,24 @@ The output report shows:
     ]
   }
 }
+```
+
+## Contributing
+
+To run the project on the local system:
+
+```bash
+node index.js -c ./examples/config.toml
+```
+
+To build the project in Docker:
+
+```bash
+docker build -t fcheck .
+```
+
+To run in docker:
+
+```bash
+docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./examples/config.toml -r ./data/report.json
 ```
