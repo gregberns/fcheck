@@ -2,7 +2,7 @@
 
 What would a language agnostic, integration test framework look like?
 
-Maybe something like Postman / Newman(its command line executor), but a tool that would:
+Maybe something like Postman(an Http testing tool) or Newman(its command line executor), but a tool that would:
 
 * Run general setup commands
 * Execute general commands to test a feature
@@ -11,7 +11,7 @@ Maybe something like Postman / Newman(its command line executor), but a tool tha
   * Validate the results
 * Run teardown commands
 
-To be as flexible as possible and not re-invent the wheel, we can leverage any local commands, so on Linux, we can run bash/sh commands: to move files, run Kafka commands, make HTTP requests with curl, or any other commands that the OS is cabable of.
+To be as flexible as possible and not re-invent the wheel, we can leverage local OS commands. So on Linux, we can run bash/sh commands: to move files, run Kafka commands, make HTTP requests with curl, or any other commands that the OS supports or that are installed.
 
 If the OS or Docker image doesn't have the command, then just install the command prior to running the tests!
 
@@ -19,7 +19,7 @@ If the OS or Docker image doesn't have the command, then just install the comman
 
 ## Why - The Problem To Be Solved
 
-Testing microservices can be hard, especially within the context of a distributed system. We could write a set of scripts to execute these test, but writing, debugging, but scripts can be a challenge to write and maintain.
+Testing microservices can be hard, especially within the context of a distributed system. We could write a set of scripts to execute these tests, but writing and debugging them can be difficult and maintainting and extending them can be unbearable.
 
 This project attempts to simplify this problem.
 

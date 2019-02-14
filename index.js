@@ -57,17 +57,26 @@ function run(configFileLocation) {
 }
 
 const runProcesses = async config => {
-  let setup = await runTest("Setup", config.setup[0])
-  if (setup.result === 'failure') {
-    return {
-      result: 'failure',
-      setup,
+  let setup = undefined
+  if (config.setup && config.setup[0]) {
+    setup = await runTest("Setup", config.setup[0])
+    if (setup.result === 'failure') {
+      return {
+        result: 'failure',
+        setup,
+      }
     }
   }
-  let tests = await runTests(config.test)
-  // dont stop the tear down from running if one of the tests fail to run
-  let teardown = await runTest("Teardown", config.teardown[0])
 
+  let tests = await runTests(config.test)
+
+  let teardown = undefined;
+  if (config.teardown && config.teardown[0]) {
+    // dont stop the tear down from running if one of the tests fail to run
+    teardown = await runTest("Teardown", config.teardown[0])
+
+  }
+  
   let failures = tests.filter(test => test.result === 'failure').length
   let result = failures === 0 ? 'success' : 'failure'
 
