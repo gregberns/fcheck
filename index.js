@@ -40,7 +40,7 @@ function run(configFileLocation) {
       return runProcesses(config)
     })
     .then(async results => {
-      console.log(JSON.stringify(results,  undefined, 2))
+      console.log(JSON.stringify(util.inspect(results),  undefined, 2))
       
       await writeFile(program.reportFile, JSON.stringify(util.inspect(results),  undefined, 2))
 
@@ -128,7 +128,7 @@ const runTestV2 = async (name, test) => {
       result: 'disabled' 
     }
   }
-console.log('test.command', test.command)
+
   let runnable = test.command
     .map((commandObj, index) => {
       return runProcess(commandObj.command, commandObj.timeout)
