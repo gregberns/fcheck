@@ -8,6 +8,7 @@
   [ { name = "test1"
     , description = "Write two files and check they are the same"
     , disabled = False
+    , parallel = False
     , command = 
       [ { command = "rm -f ./data/cats.txt && rm ./data/cats.txt && rm -f ./data/dogs.txt" }
       , { command = "echo \"Dogs\" > ./data/dogs.txt" }

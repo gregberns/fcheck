@@ -15,6 +15,7 @@ program
   .version('0.1.0')
   .option('-c, --config-file [file]', 'Configuration file containing tests to be run', './config/config.toml')
   .option('-r, --report-file [file]', 'File with test configuration', './data/report.json')
+  .option('-v, --verbose-errors', 'Verbose error logging')
   .parse(process.argv);
 
 if (!program.configFile) {
@@ -40,9 +41,9 @@ function run(configFileLocation) {
       return runProcesses(config)
     })
     .then(async results => {
-      console.log(JSON.stringify(util.inspect(results),  undefined, 2))
+      console.log(JSON.stringify(results,  undefined, 2))
       
-      await writeFile(program.reportFile, JSON.stringify(util.inspect(results),  undefined, 2))
+      await writeFile(program.reportFile, JSON.stringify(results,  undefined, 2))
 
       console.log(`Report file written to: ${program.reportFile}`)
       
@@ -129,45 +130,114 @@ const runTestV2 = async (name, test) => {
     }
   }
 
-  let runnable = test.command
-    .map((commandObj, index) => {
-      return runProcess(commandObj.command, commandObj.timeout)
+  console.log(`runTestV2: ${name}. Parallel: ${test.parallel?'true':'false'}`)
+
+  if (test.parallel) {
+    let runnable = test.command
+      .map(async (commandObj, index) => {
+        let commandName = commandObj.name || `Command # ${index+1}`
+        console.log(`Start RunProcess. Command Name: ${commandName}`)
+        
+        return runProcess(commandObj.command, commandObj.timeout)
+          .then(result => {
+            console.log(`End RunProcess. Command Name: ${commandName}`)
+            let formattedResult = (result instanceof Buffer) ? result.toString() : result
+            return {
+              commandName: commandName,
+              commandResult: 'success',
+              commandCommand: commandObj.command,
+              commandOutput: formattedResult,
+            }
+          })
+          .catch(error => {
+            console.log(`End RunProcess. Command Name: ${commandName}`)
+            throw {
+              commandName: commandObj.name || `Command # ${index+1}`,
+              commandResult: 'failure',
+              commandCommand: commandObj.command,
+              commandOutput: error,
+            }
+          })
+      })
+      
+    return Promise.all(runnable)
+      .then(results => {
+        // let failures = results.filter(test => test.result === 'failure').length
+        // let result = failures === 0 ? 'success' : 'failure'
+        return {
+          name,
+          result: 'success',
+          results
+        }
+      })
+      .catch(results => {
+        return {
+          name,
+          result: 'failure',
+          results
+        }
+      })
+  } else {
+
+    let results = []
+    for (let index = 0; index < test.command.length; ++index) {
+      let commandObj = test.command[index]
+      let commandName = commandObj.name || `Command # ${index+1}`
+      console.log(`Start RunProcess. Command Name: ${commandName}`)
+      
+      await runProcess(commandObj.command, commandObj.timeout)
         .then(result => {
+          console.log(`End RunProcess. Command Name: ${commandName}`)
           let formattedResult = (result instanceof Buffer) ? result.toString() : result
           return {
-            commandName: commandObj.name || `Command # ${index+1}`,
+            commandName: commandName,
             commandResult: 'success',
             commandCommand: commandObj.command,
             commandOutput: formattedResult,
           }
         })
         .catch(error => {
-          throw {
+          console.log(`End RunProcess. Command Name: ${commandName}`)
+          return {
             commandName: commandObj.name || `Command # ${index+1}`,
             commandResult: 'failure',
             commandCommand: commandObj.command,
             commandOutput: error,
           }
         })
-    })
+        .then(result => results.push(result))
+    }
+
+    console.log('res', results)
+
+    let failures = results.filter(test => test.commandResult === 'failure').length
+
+    console.log('res', results)
+
+    return {
+      name,
+      result: failures > 0 ? 'failure' : 'success',
+      results
+    }
     
-  return Promise.all(runnable)
-    .then(results => {
-      // let failures = results.filter(test => test.result === 'failure').length
-      // let result = failures === 0 ? 'success' : 'failure'
-      return {
-        name,
-        result: 'success',
-        results
-      }
-    })
-    .catch(results => {
-      return {
-        name,
-        result: 'failure',
-        results
-      }
-    })
+    // return Promise.all(runnable)
+    //   .then(results => {
+    //     // let failures = results.filter(test => test.result === 'failure').length
+    //     // let result = failures === 0 ? 'success' : 'failure'
+    //     return {
+    //       name,
+    //       result: 'success',
+    //       results
+    //     }
+    //   })
+    //   .catch(results => {
+    //     return {
+    //       name,
+    //       result: 'failure',
+    //       results
+    //     }
+    //   })
+  }
 }
 
 const runTestV1 = async (name, config) => {
@@ -262,7 +332,7 @@ const parseProcessError = e => {
         stdout: e.stdout.toString(),
         stderr: e.stderr.toString()
       },
-      rawError: e,
+      rawError: program.verboseErrors ? e : 'Not displayed. Include `-v` to include verbose errors.',
     }
   } catch (err) {
     console.error("-------------")
@@ -312,8 +382,11 @@ const parseToml = data => {
 const parseDhall = data => {
   return new Promise((resolve, reject) => {
     try {
-      let buffer = child_process.execSync(`dhall-to-json <<< '${data}'`)
+      // console.log('parseDhall', data)
+      // let buffer = child_process.execSync(`dhall-to-json <<< '${data}'`, { options: {input: data}})
+      let buffer = child_process.execSync(`dhall-to-json`, { input: data, stdio: 'pipe', shell: '/bin/bash'})
       let obj = JSON.parse(buffer.toString())
+      // console.log('parseDhall res', obj)
       resolve(obj)
     } catch (e) {
       reject(e)
