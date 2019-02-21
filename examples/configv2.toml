@@ -1,7 +1,3 @@
-# Benefits of Dhall
-# - file name declaration only once, then use string interpolation to fill in the blanks
-# - server names could be declared globally, so changing them would be trivial
-
 version = 2
 
 [[setup]]

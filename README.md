@@ -59,11 +59,68 @@ The fcheck Docker image has several tools built in:
 
 Docker support is first-class, but to solve your particular problem, you may need to extend the base fcheck image with the binary's you need to use.
 
+Dockerfile
+
+```Dockerfile
+FROM fcheck
+
+WORKDIR /fcheck
+
+# by default pass the config file location (`c`) and output location (`-r`)
+CMD -c /fcheck/config/config.toml -r /fcheck/output/report.json
+
+# if you want to override the default behavior and run a 
+# command before the process begins, run like this:
+ENTRYPOINT []
+CMD sleep 15s &&\
+    node index.js -c /fcheck/config/config.toml -r /fcheck/output/report.json
+```
+
+docker-compose.yml:
+
+```yml
+version: '3.7'
+
+services:
+  fcheck:
+    build: 
+      context: .
+      dockerfile: ./fcheck/Dockerfile
+    volumes:
+      - ./fcheck/config:/fcheck/config
+      - ./fcheck/data:/fcheck/data
+      - ./fcheck/output:/fcheck/output
+```
+
 ## Configuration
 
 Currently, fcheck supports TOML files as the default configuration method.
 
 In future implementations, we'd like to support the [Dhall configuration language](https://dhall-lang.org/). This will help reduce duplicate declaration of paths, files, commands, etc, with an aim to improve maintainability and robustness of our testing frameworks.
+
+### Dhall Support
+
+Dhall is a configuration language that allows you to remove **all** the duplication you generally see when dealing with configuration files.
+
+For example, filenames, paths, server names, and environment values can all be declared once, so instead of changing them in multiple places, like in a normal script, you can change them in a single place. Simple string interpolation is used to use the variable name.
+
+See examples of usage below.
+
+If you already have a `.dhall` config file, just pass the filename, including the `.dhall` extension. To test a Dhall config file:
+
+```bash
+dhall-to-json < ./examples/config.dhall
+```
+
+#### Running Dhall Locally
+
+To run fcheck locally on Mac or Windows (outside the Docker image), you will want to read through the [Dhall Getting Started Guide](https://github.com/dhall-lang/dhall-lang/wiki/Getting-started%3A-Generate-JSON-or-YAML).
+
+Install on Mac
+
+```
+brew install dhall-json
+```
 
 ## Example
 
@@ -215,7 +272,7 @@ The output report shows:
 To run the project on the local system:
 
 ```bash
-node index.js -c ./examples/config.toml
+node index.js -c ./examples/configv2.toml
 ```
 
 To build the project in Docker:

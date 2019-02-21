@@ -6,7 +6,7 @@ const concat = require('concat-stream');
 const fs = require('fs');
 const kafka = require('kafka-node');
 const child_process = require('child_process');
-const util = require('util')
+const util = require('util');
 var StringDecoder = require('string_decoder').StringDecoder;
 
 console.log('fcheck starting')
@@ -27,19 +27,22 @@ console.log('ConfigFile location: ' + configFile);
 function run(configFileLocation) {
   readFile(configFileLocation)
     .then(data => {
-      // console.log(data)
-      return parseToml(data)
+      if (configFile.endsWith('.toml')) {
+        return parseToml(data)
+      }
+      if (configFile.endsWith('.dhall')) {
+        return parseDhall(data)
+      }
+      throw new Exception(`Config file did not end in a valid format: ${configFile}. Supported formats: .toml, .dhall`)
     })
     .then(config => {
-      console.log(JSON.stringify(config,  undefined, 2))
-      // return runTests(config.test)
+      console.log('config', JSON.stringify(config,  undefined, 2))
       return runProcesses(config)
     })
     .then(async results => {
       console.log(JSON.stringify(results,  undefined, 2))
       
-      await writeFile(program.reportFile, JSON.stringify(results,  undefined, 2))
-      // await writeFile(program.reportFile, util.inspect(results))
+      await writeFile(program.reportFile, JSON.stringify(util.inspect(results),  undefined, 2))
 
       console.log(`Report file written to: ${program.reportFile}`)
       
@@ -125,7 +128,7 @@ const runTestV2 = async (name, test) => {
       result: 'disabled' 
     }
   }
-
+console.log('test.command', test.command)
   let runnable = test.command
     .map((commandObj, index) => {
       return runProcess(commandObj.command, commandObj.timeout)
@@ -300,6 +303,18 @@ const parseToml = data => {
   return new Promise((resolve, reject) => {
     try {
       resolve(toml.parse(data))
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+const parseDhall = data => {
+  return new Promise((resolve, reject) => {
+    try {
+      let buffer = child_process.execSync(`dhall-to-json <<< '${data}'`)
+      let obj = JSON.parse(buffer.toString())
+      resolve(obj)
     } catch (e) {
       reject(e)
     }
