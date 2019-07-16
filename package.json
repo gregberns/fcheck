@@ -12,6 +12,7 @@
   "dependencies": {
     "commander": "^2.19.0",
     "concat-stream": "^2.0.0",
+    "express": "^4.16.4",
     "kafka-node": "^4.0.1",
     "toml": "^3.0.0"
   }

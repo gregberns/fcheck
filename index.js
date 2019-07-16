@@ -312,7 +312,8 @@ const runCommand = async (config, timeout) => {
 const runProcess = (command, timeout) => {
   return new Promise((resolve, reject) => {
     try {
-      let buffer = child_process.execSync(command, {timeout})
+      let options = {timeout, shell: '/bin/bash'}
+      let buffer = child_process.execSync(command, options)
       resolve(buffer)
     } catch (e) {
       var err = parseProcessError(e)
