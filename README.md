@@ -286,3 +286,10 @@ To run in docker:
 ```bash
 docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./examples/config.toml -r ./data/report.json
 ```
+
+### Rust
+
+```
+cargo build
+cargo run -- -c ./config/config.toml
+```
