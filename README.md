@@ -289,7 +289,7 @@ docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fchec
 
 ### Rust
 
-```
+```bash
 cargo build
-cargo run -- -c ./config/config.toml
+cargo run -- -c ./config/config-v3.toml
 ```
