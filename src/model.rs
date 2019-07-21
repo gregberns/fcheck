@@ -31,19 +31,25 @@ pub struct CommandSet {
     pub processing_kind: ProcessingKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ExecutableCommand {
     pub name: Option<String>,
     pub description: Option<String>,
     pub cmd: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CommandResult {
     pub command: ExecutableCommand,
-    pub stdout: Option<String>,
-    pub stderr: Option<String>,
-    pub exit_code: u32,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub exit_code: String,
+    pub unknown_error: Option<String>,
+}
+impl CommandResult {
+    pub fn success(&self) -> bool {
+        self.exit_code == "0".to_string()
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -51,10 +57,10 @@ pub struct CommandSetResult {
     pub results: Vec<CommandResult>
 }
 impl CommandSetResult {
-    fn success(&self) -> bool {
+    pub fn success(&self) -> bool {
         true
     }
-    fn errors(&self) -> Vec<CommandResult> {
+    pub fn errors(&self) -> Vec<CommandResult> {
         //Filter all failures
         Vec::new()
     }

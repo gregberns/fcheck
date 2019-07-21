@@ -5,8 +5,10 @@ use clap::{Arg, App};
 
 mod model;
 mod parser;
+mod processor;
 
 use parser::{prepare_file, file_extension_to_filetype};
+use processor::{run};
 
 fn main() {
     let matches = App::new("fcheck")
@@ -64,6 +66,8 @@ fn main() {
     // Failed to parse file. Error: {:?}
 
     println!("out: {:?}", module);
+
+    run();
 
 }
 
