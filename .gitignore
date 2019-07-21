@@ -1,5 +1,6 @@
 /target
-
+/test_input
+/test_output
 
 data/
 config/

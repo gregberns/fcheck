@@ -10,6 +10,8 @@ use crate::model::{
     ExecutableCommand,
     CommandResult,
     CommandSetResult,
+    CommandFamilyResult,
+    ProcessingModuleResult,
     };
 
 /// New
@@ -43,34 +45,46 @@ use crate::model::{
 ///     * CommandResult :: { Command, StdOut, StdErr, ExitCode }
 
 
-pub fn run() {
-    let cmd = ExecutableCommand {
-        name: Option::None,
-        description: Option::None,
-        cmd: "echo Hello".to_string(),
-    };
-
-    let res = run_command(&cmd);
-
-    println!("Result: {:?}", res);
-    println!("Result Out: {:?}", from_utf8(&res.stdout));
-    
-
+pub fn run(module: &ProcessingModule) -> ProcessingModuleResult {
+    run_processingmodule(&run_command, module)
 }
 
-// pub fn run(module: ProcessingModule) -> CommandSetResult {
+pub fn run_processingmodule(
+    run_cmd: &Fn(&ExecutableCommand) -> CommandResult,
+    module: &ProcessingModule)
+     -> ProcessingModuleResult {
 
-// }
+    let setup = run_commandset(true, &run_command, &module.setup);
 
-// pub fn run_commandfamily(family: CommandFamily) -> CommandFamilyResult {
+    let tests = run_commandfamily(&run_command, &module.tests);
 
-//     for set in family.sets {
-//         let res = run_commandset(true, );
-//         if !res.success() {
+    let teardown = run_commandset(false, &run_command, &module.teardown);
 
-//         }
-//     }
-// }
+    ProcessingModuleResult {
+        module: module.clone(),
+        setup: setup,
+        tests: tests,
+        teardown: teardown,
+    }
+}
+
+pub fn run_commandfamily(
+    run_cmd: &Fn(&ExecutableCommand) -> CommandResult,
+    family: &CommandFamily)
+     -> CommandFamilyResult {
+
+    let mut results = Vec::new();
+
+    for set in family.sets.iter() {
+        let res = run_commandset(true, run_cmd, &set);
+        results.push(res);
+    }
+    
+    CommandFamilyResult {
+        family: family.clone(),
+        sets: results,
+    }
+}
 
 pub fn run_commandset(
     stop_on_failure: bool,
@@ -89,6 +103,7 @@ pub fn run_commandset(
     }
 
     CommandSetResult {
+        set: set.clone(),
         results: results,
     }
 }

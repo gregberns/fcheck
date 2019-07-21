@@ -6,9 +6,11 @@ use clap::{Arg, App};
 mod model;
 mod parser;
 mod processor;
+mod output_formatter;
 
 use parser::{prepare_file, file_extension_to_filetype};
 use processor::{run};
+use output_formatter::{format_module};
 
 fn main() {
     let matches = App::new("fcheck")
@@ -62,12 +64,18 @@ fn main() {
     let config_contents = fs::read_to_string(config_path)
         .expect("Failed to read config file.");
 
-    let module = prepare_file(config_file_type, config_contents);
-    // Failed to parse file. Error: {:?}
-
+    let module = prepare_file(config_file_type, config_contents)
+        .expect("Failed to process config file");
+    
     println!("out: {:?}", module);
 
-    run();
+    let res = run(&module);
+
+    println!("Module Result: \n{}", format_module(&res));
+
+    //To do
+    // Add module name
+    // Add full success of module
 
 }
 
@@ -76,4 +84,3 @@ fn get_extension_from_filename(filename: &str) -> Option<&str> {
         .extension()
         .and_then(OsStr::to_str)
 }
-

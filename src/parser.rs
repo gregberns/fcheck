@@ -199,22 +199,24 @@ fn t_parse_error() {
 
 fn testmodule_to_processingmodel(module: TestModule) -> ProcessingModule {
     ProcessingModule {
-        setup: commandlist_to_commandset(CommandSetType::Setup, module.setup),
+        setup: commandlist_to_commandset(Some("Setup".to_string()), CommandSetType::Setup, module.setup),
         tests: testlist_to_commandfamily(module.tests),
-        teardown: commandlist_to_commandset(CommandSetType::Teardown, module.teardown),
+        teardown: commandlist_to_commandset(Some("Teardown".to_string()), CommandSetType::Teardown, module.teardown),
     }
 }
 
-fn commandlist_to_commandset(c_type: CommandSetType, opt_commands: Option<Vec<Command>>) -> CommandSet {
+fn commandlist_to_commandset(name: Option<String>, c_type: CommandSetType, opt_commands: Option<Vec<Command>>) -> CommandSet {
     match opt_commands {
         Some(commands) => 
             CommandSet {
+                name: name,
                 set_type: c_type,
                 commands: commands.iter().map(|c| command_to_execommand(c)).collect(),
                 processing_kind: ProcessingKind::Serial,
             },
         None => 
             CommandSet {
+                name: name,
                 set_type: c_type,
                 commands: Vec::new(),
                 processing_kind: ProcessingKind::Serial,
@@ -223,14 +225,16 @@ fn commandlist_to_commandset(c_type: CommandSetType, opt_commands: Option<Vec<Co
 }
 
 fn testlist_to_commandfamily(tests: Vec<Test>) -> CommandFamily {
-    let command_sets = tests.iter().map(|t| {
-        CommandSet {
-            set_type: CommandSetType::Test,
-            commands: t.commands.iter().map(|c| command_to_execommand(c)).collect(),
-            processing_kind: ProcessingKind::Serial,
-        }
-    })
-    .collect();
+    let command_sets = tests.iter()
+        .map(|t| {
+            CommandSet {
+                name: t.name.clone(),
+                set_type: CommandSetType::Test,
+                commands: t.commands.iter().map(|c| command_to_execommand(c)).collect(),
+                processing_kind: ProcessingKind::Serial,
+            }
+        })
+        .collect();
     
     CommandFamily {
         sets: command_sets,
