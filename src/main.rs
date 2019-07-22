@@ -41,7 +41,7 @@ fn main() {
 //   .parse(process.argv);
 
     let config_file = matches.value_of("config-file").unwrap_or("./config.toml");
-    let output_report_path = matches.value_of("report-file").unwrap_or("./output/report.json");
+    let output_report_filepath = matches.value_of("report-file").unwrap_or("./output/report.json");
 
     // match matches.occurrences_of("v") {
     //     0 => println!("No verbose info"),
@@ -67,15 +67,31 @@ fn main() {
     let module = prepare_file(config_file_type, config_contents)
         .expect("Failed to process config file");
     
-    println!("out: {:?}", module);
+    println!("Config file found: {}. Starting....", config_path.display());
 
     let res = run(&module);
 
-    println!("Module Result: \n{}", format_module(&res));
+    let report_string = format_module(&res);
+
+    println!("Run Results: \n{} \n", report_string);
+
+
+    let output_report_path = Path::new(output_report_filepath);
+
+    let output_report_parent = output_report_path
+        .parent()
+        .expect("Couldn't get report path parent");
+
+    fs::create_dir_all(&output_report_parent.display().to_string());
+    fs::write(output_report_path, &report_string)
+        .expect(&format!("Unable to write report file: {}", &report_string));
+    println!("Run results report written to: {}", output_report_path.display());
+
 
     //To do
     // Add module name
     // Add full success of module
+    // Timeouts
 
 }
 

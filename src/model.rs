@@ -8,7 +8,7 @@ pub struct ProcessingModule {
 #[derive(Debug, PartialEq, Clone)]
 pub enum ProcessingKind {
     Serial,
-    Parallel,
+    // Parallel,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -75,15 +75,43 @@ impl CommandSetResult {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct CommandResult {
-    pub command: ExecutableCommand,
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-    pub exit_code: String,
-    pub unknown_error: Option<String>,
+// pub struct CommandResult {
+//     pub command: ExecutableCommand,
+//     pub stdout: String,
+//     pub stderr: String,
+//     pub exit_code: String,
+//     pub unknown_error: Option<String>,
+// }
+pub enum CommandResult {
+    OsError {
+        pub command: ExecutableCommand,
+        pub error: String,
+    },
+    Timeout {
+        pub command: ExecutableCommand,
+        pub stdout: String,
+        pub stderr: String,
+    },
+    IrregularExitCode {
+        pub command: ExecutableCommand,
+        pub stdout: String,
+        pub stderr: String,
+        pub exit_code: String,
+    },
+    StandardResult {
+        pub command: ExecutableCommand,
+        pub stdout: String,
+        pub stderr: String,
+        pub exit_code: i32,
+    },
 }
 impl CommandResult {
     pub fn success(&self) -> bool {
-        self.exit_code == "0".to_string()
+        match self {
+            CommandResult::OsError{} => false,
+            CommandResult::Timeout{} => false,
+            CommandResult::IrregularExitCode{} => false,
+            CommandResult::StandardResult{exit_code} => exit_code == 0,
+        }
     }
 }

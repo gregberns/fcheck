@@ -1,11 +1,21 @@
-use std::str::{from_utf8};
-use subprocess::{Exec, CaptureData, ExitStatus, PopenError};
+// use std::str::{from_utf8};
+use std::time::Duration;
+use std::ffi::{OsStr, OsString};
+use subprocess::{
+    Exec, 
+    CaptureData, 
+    ExitStatus, 
+    Popen,
+    PopenConfig,
+    PopenError,
+    Redirection,
+    };
 
 use crate::model::{
     ProcessingModule, 
-    ProcessingKind, 
+    // ProcessingKind, 
     CommandFamily, 
-    CommandSetType, 
+    // CommandSetType, 
     CommandSet,
     ExecutableCommand,
     CommandResult,
@@ -14,35 +24,35 @@ use crate::model::{
     ProcessingModuleResult,
     };
 
-/// New
-///     * Support running multiple config files
-/// 
-/// Read + Parse Config File
-///     * Support Toml
-///     * Support Dahl
-///     * Check there is only one Setup and Teardown and there are Tests
-/// Run Processes
-///     * Run Setup, Tests, Teardown (CommandSet)
-///     * Handle Response
-///     * Write to Report JSON output
-///     * Write to Console in readable format
-/// Run Setup (Optional) (CommandSet)
-///     * If setup fails, don't run Tests
-///     * Setup is like a Test but if it fails then stop
-/// Run Teardown (Optional) (CommandSet)
-///     * Run all teardowns, even if one fails
-///     * Teardown is like a Test
-/// Run Tests
-///     * Set of CommandSet (CommandFamily)
-///     * Run CommandSet Serially
-///     * Run CommandSet in Parallel
-///         * Control the paralelism, default to n
-/// Run Test
-///     * CommandSet -> CommandSetResult 
-///     * CommandSetResult: { CommandResult <Vec<CommandResult>, Vec<CommandError>>
-///         * success :: () -> bool
-///         * errors :: () -> Vec<CommandError>
-///     * CommandResult :: { Command, StdOut, StdErr, ExitCode }
+// New
+//     * Support running multiple config files
+// 
+// Read + Parse Config File
+//     * Support Toml
+//     * Support Dahl
+//     * Check there is only one Setup and Teardown and there are Tests
+// Run Processes
+//     * Run Setup, Tests, Teardown (CommandSet)
+//     * Handle Response
+//     * Write to Report JSON output
+//     * Write to Console in readable format
+// Run Setup (Optional) (CommandSet)
+//     * If setup fails, don't run Tests
+//     * Setup is like a Test but if it fails then stop
+// Run Teardown (Optional) (CommandSet)
+//     * Run all teardowns, even if one fails
+//     * Teardown is like a Test
+// Run Tests
+//     * Set of CommandSet (CommandFamily)
+//     * Run CommandSet Serially
+//     * Run CommandSet in Parallel
+//         * Control the paralelism, default to n
+// Run Test
+//     * CommandSet -> CommandSetResult 
+//     * CommandSetResult: { CommandResult <Vec<CommandResult>, Vec<CommandError>>
+//         * success :: () -> bool
+//         * errors :: () -> Vec<CommandError>
+//     * CommandResult :: { Command, StdOut, StdErr, ExitCode }
 
 
 pub fn run(module: &ProcessingModule) -> ProcessingModuleResult {
@@ -54,11 +64,11 @@ pub fn run_processingmodule(
     module: &ProcessingModule)
      -> ProcessingModuleResult {
 
-    let setup = run_commandset(true, &run_command, &module.setup);
+    let setup = run_commandset(true, &run_cmd, &module.setup);
 
-    let tests = run_commandfamily(&run_command, &module.tests);
+    let tests = run_commandfamily(&run_cmd, &module.tests);
 
-    let teardown = run_commandset(false, &run_command, &module.teardown);
+    let teardown = run_commandset(false, &run_cmd, &module.teardown);
 
     ProcessingModuleResult {
         module: module.clone(),
@@ -110,47 +120,176 @@ pub fn run_commandset(
 
 pub fn run_command(command: &ExecutableCommand) -> CommandResult {
 
-    /// Support Timeout
+    // Support Timeout
 
-    let res_data: Result<CaptureData, PopenError> = 
-        Exec::shell(&command.cmd)
-            // .popen()
-            // .wait_timeout(5)
-            .capture();
+    //This works, but doesn't support timeout or switching which shell to use
+    // let res_data: Result<CaptureData, PopenError> = 
+    //     Exec::shell(&command.cmd)
+    //         .capture();
 
-    /// This needs to be improved:
-    /// * Return a valid exit_code
-    ///     * If a bad one is returned, then include that in a 'uncommon' error
-    /// * Return a result where errors are 'uncommon' errors
+    // let timeout = Duration::from_millis(command.timeout);
+    let timeout = Duration::from_millis(0);
 
-    match res_data {
+    let res_data = start_process(timeout, &vec!("sh", "-c", &command.cmd));
+
+    translate_result(res_data)
+
+    // This needs to be improved:
+    // * Return a valid exit_code
+    //     * If a bad one is returned, then include that in a 'uncommon' error
+    // * Return a result where errors are 'uncommon' errors
+
+    // match res_data {
+    //     Ok(res) => {
+    //         let exit_code = match res.exit_status {
+    //             // https://docs.rs/subprocess/0.1.18/subprocess/enum.ExitStatus.html
+    //             ExitStatus::Exited(i) => i.to_string(),
+    //             ExitStatus::Signaled(i) => format!("Signaled({})", i),
+    //             ExitStatus::Other(i) => format!("Other({})", i),
+    //             ExitStatus::Undetermined => "Undetermined".to_string(),
+    //         };
+
+    //         CommandResult {
+    //             command: command.clone(),
+    //             stdout: res.stdout_str(),
+    //             stderr: res.stderr_str(),
+    //             exit_code: exit_code,
+    //             unknown_error: Option::None,
+    //         }
+    //     },
+    //     Err(e) => 
+    //         CommandResult {
+    //             command: command.clone(),
+    //             stdout: "".to_string(),
+    //             stderr: "".to_string(),
+    //             exit_code: "-1".to_string(),
+    //             unknown_error: Some(format!("Unknown error occured: {}", e)),
+    //         }
+    // }
+}
+
+
+
+// pub struct CommandResult {
+//     pub command: ExecutableCommand,
+//     pub stdout: String,
+//     pub stderr: String,
+//     pub exit_code: String,
+//     pub unknown_error: Option<String>,
+// }
+
+fn translate_result(
+    command: &ExecutableCommand,
+    result: Result<CapturedData, PopenError>)
+    -> CommandResult {
+    match result {
         Ok(res) => {
-            let exit_code = match res.exit_status {
-                // https://docs.rs/subprocess/0.1.18/subprocess/enum.ExitStatus.html
-                ExitStatus::Exited(i) => i.to_string(),
-                ExitStatus::Signaled(i) => format!("Signaled({})", i),
-                ExitStatus::Other(i) => format!("Other({})", i),
-                ExitStatus::Undetermined => "Undetermined".to_string(),
-            };
-
-            CommandResult {
-                command: command.clone(),
-                stdout: res.stdout,
-                stderr: res.stderr,
-                exit_code: exit_code,
-                unknown_error: Option::None,
+            match res.exit_status {
+                Some(exit_status) => match exit_status {
+                    // https://docs.rs/subprocess/0.1.18/subprocess/enum.ExitStatus.html
+                    ExitStatus::Exited(s) => {
+                        CommandResult::StandardResult {
+                            command: command.clone(),
+                            stdout: res.stdout_str(),
+                            stderr: res.stderr_str(),
+                            exit_code: exit_code,
+                        }
+                    },
+                    ExitStatus::Signaled(i) =>
+                        CommandResult::IrregularExitCode {
+                            command: command.clone(),
+                            stdout: res.stdout_str(),
+                            stderr: res.stderr_str(),
+                            exit_code: format!("Signaled({})", i),
+                        },
+                    ExitStatus::Other(i) =>
+                        CommandResult::IrregularExitCode {
+                            command: command.clone(),
+                            stdout: res.stdout_str(),
+                            stderr: res.stderr_str(),
+                            exit_code: format!("Other({})", i),
+                        },
+                    ExitStatus::Undetermined => 
+                        CommandResult::IrregularExitCode {
+                            command: command.clone(),
+                            stdout: res.stdout_str(),
+                            stderr: res.stderr_str(),
+                            exit_code: "Undetermined".to_string(),
+                        },
+                },
+                None => {
+                    //Timeout Occurred
+                    CommandResult::Timeout {
+                        command: command,
+                        stdout: res.stdout_str(),
+                        stderr: res.stderr_str(),
+                    },
+                }
             }
         },
         Err(e) => 
-            CommandResult {
+            CommandResult::OsError {
                 command: command.clone(),
-                stdout: vec!(),
-                stderr: vec!(),
-                exit_code: "-1".to_string(),
-                unknown_error: Some(format!("Unknown error occured: {}", e)),
+                unknown_error: Some(format!("OS error occured: {}", e)),
             }
     }
 }
+
+fn start_process<S: AsRef<OsStr>>(timeout: Duration, args: &[S]) 
+    -> Result<CapturedData, PopenError> {
+
+    let mut p = Popen::create(
+        args, 
+        PopenConfig {
+            stdout: Redirection::Pipe,
+            stderr: Redirection::Pipe,
+            ..Default::default()
+        })?;
+    // -> IoResult<(Option<Vec<u8>>, Option<Vec<u8>>)>
+    let (maybe_out, maybe_err) = p.communicate_bytes(None)?;
+    let out = maybe_out.unwrap_or_else(Vec::new);
+    let err = maybe_err.unwrap_or_else(Vec::new);
+    
+    // returns `Ok(None)` if the timeout is known to have elapsed.
+    let status = p.wait_timeout(timeout)?;
+
+
+    Ok(CapturedData {
+        stdout: out, stderr: err, exit_status: status
+    })
+}
+
+// #[test]
+// fn wait_timeout() {
+
+//     start_process(Duration::from_millis(100), &["sleep", "0.5"]);
+
+
+
+//     let mut p = Popen::create(&["sleep", "0.5"], 
+//         PopenConfig {
+//             stdout: Redirection::Pipe,
+//             ..Default::default()
+//         })
+//         .unwrap();
+
+//     p.wait_timeout(Duration::from_millis(100)).unwrap()
+
+// // let mut p = Popen::create(&["sh", "-c", r#"test "$SOMEVAR" = "bar""#],
+// //                               PopenConfig {
+// //                                   stdout: Redirection::Pipe,
+// //                                   env: Some(dups),
+// //                                   ..Default::default()
+// //                               }).unwrap();
+// //     assert!(p.wait().unwrap().success());
+
+
+
+//     let ret = p.wait_timeout(Duration::from_millis(100)).unwrap();
+//     assert!(ret.is_none());
+//     let ret = p.wait_timeout(Duration::from_millis(450)).unwrap();
+//     assert_eq!(ret, Some(ExitStatus::Exited(0)));
+// }
 
 #[test]
 fn t_exec_simple() {
