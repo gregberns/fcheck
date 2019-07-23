@@ -25,15 +25,49 @@ pub struct TestOutput {
     commands: Vec<CommandOutput>,
 }
 
+// #[derive(Serialize, Debug, PartialEq)]
+// pub struct CommandOutput {
+//     pub name: Option<String>,
+//     pub result: String,
+//     pub command: String,
+//     pub stdout: String,
+//     pub stderr: String,
+//     pub exit_code: String,
+//     pub error: Option<String>,
+// }
+
 #[derive(Serialize, Debug, PartialEq)]
-pub struct CommandOutput {
-    pub name: Option<String>,
-    pub result: String,
-    pub command: String,
-    pub stdout: String,
-    pub stderr: String,
-    pub exit_code: String,
-    pub unknown_error: Option<String>,
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum CommandOutput {
+    OsError {
+        name: Option<String>,
+        command: String,
+        result: String,
+        error: String,
+    },
+    Timeout {
+        name: Option<String>,
+        command: String,
+        result: String,
+        stdout: String,
+        stderr: String,
+    },
+    IrregularExitCode {
+        name: Option<String>,
+        command: String,
+        result: String,
+        stdout: String,
+        stderr: String,
+        exit_code: String,
+    },
+    Complete {
+        name: Option<String>,
+        command: String,
+        result: String,
+        stdout: String,
+        stderr: String,
+        exit_code: u32,
+    },
 }
 
 pub fn format_module(module: &ProcessingModuleResult) -> String {
@@ -63,15 +97,50 @@ fn map_test(set: &CommandSetResult) -> TestOutput {
 }
 
 fn map_command(res: &CommandResult) -> CommandOutput {
-    CommandOutput {
-        name: res.command.name.clone(),
-        result: result_to_string(res.success()),
-        command: res.command.cmd.clone(),
-        stdout: res.stdout.clone(),
-        stderr: res.stderr.clone(),
-        exit_code: res.exit_code.clone(),
-        unknown_error: res.unknown_error.clone(),
+    // let name = res.command.name.clone();
+    let result = result_to_string(res.success());
+    // let command = res.command.cmd.clone();
+
+    match res {
+        CommandResult::OsError {command, error} => CommandOutput::OsError {
+            name: command.name.clone(),
+            command: command.cmd.clone(),
+            result: result,
+            error: error.clone(),
+        },
+        CommandResult::Timeout {command, stdout, stderr} => CommandOutput::Timeout {
+            name: command.name.clone(),
+            command: command.cmd.clone(),
+            result: result,
+            stdout: stdout.clone(),
+            stderr: stderr.clone(),
+        },
+        CommandResult::IrregularExitCode {command, stdout, stderr, exit_code} => CommandOutput::IrregularExitCode {
+            name: command.name.clone(),
+            command: command.cmd.clone(),
+            result: result,
+            stdout: stdout.clone(),
+            stderr: stderr.clone(),
+            exit_code: exit_code.clone(),
+        },
+        CommandResult::StandardResult {command, stdout, stderr, exit_code} => CommandOutput::Complete {
+            name: command.name.clone(),
+            command: command.cmd.clone(),
+            result: result,
+            stdout: stdout.clone(),
+            stderr: stderr.clone(),
+            exit_code: exit_code.clone(),
+        },
     }
+    // CommandOutput {
+    //     name: res.command.name.clone(),
+    //     result: result_to_string(res.success()),
+    //     command: res.command.cmd.clone(),
+    //     stdout: res.stdout.clone(),
+    //     stderr: res.stderr.clone(),
+    //     exit_code: res.exit_code.clone(),
+    //     unknown_error: res.unknown_error.clone(),
+    // }
 }
 
 pub fn to_json(module: &ModuleOutput) -> String {

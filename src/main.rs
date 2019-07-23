@@ -67,7 +67,8 @@ fn main() {
     let module = prepare_file(config_file_type, config_contents)
         .expect("Failed to process config file");
     
-    println!("Config file found: {}. Starting....", config_path.display());
+    println!("Config file found: {}.", config_path.display());
+    println!("Starting....");
 
     let res = run(&module);
 
@@ -89,9 +90,11 @@ fn main() {
 
 
     //To do
-    // Add module name
-    // Add full success of module
+    // ~~Add full success of module~~
     // Timeouts
+    //  * 0 should be 'no timeout'
+    // Stop early if Setup fails
+    // Add module name
 
 }
 

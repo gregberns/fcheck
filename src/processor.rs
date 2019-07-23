@@ -65,6 +65,16 @@ pub fn run_processingmodule(
      -> ProcessingModuleResult {
 
     let setup = run_commandset(true, &run_cmd, &module.setup);
+    //Need ability to exit if there was a failure
+    // StopOnSetupFailure = true && !setup.success()
+    // if !setup.success() {
+    //     ProcessingModuleResult {
+    //         module: module.clone(),
+    //         setup: setup,
+    //         tests: None,
+    //         teardown: None,
+    //     }
+    // }
 
     let tests = run_commandfamily(&run_cmd, &module.tests);
 
@@ -132,7 +142,7 @@ pub fn run_command(command: &ExecutableCommand) -> CommandResult {
 
     let res_data = start_process(timeout, &vec!("sh", "-c", &command.cmd));
 
-    translate_result(res_data)
+    translate_result(&command, res_data)
 
     // This needs to be improved:
     // * Return a valid exit_code
@@ -168,7 +178,11 @@ pub fn run_command(command: &ExecutableCommand) -> CommandResult {
     // }
 }
 
-
+struct CapturedData {
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+    exit_status: Option<ExitStatus>,
+}
 
 // pub struct CommandResult {
 //     pub command: ExecutableCommand,
@@ -177,6 +191,10 @@ pub fn run_command(command: &ExecutableCommand) -> CommandResult {
 //     pub exit_code: String,
 //     pub unknown_error: Option<String>,
 // }
+
+fn from_utf8_lossy(vec_byte: Vec<u8>) -> String {
+    String::from_utf8_lossy(&vec_byte).into_owned()
+}
 
 fn translate_result(
     command: &ExecutableCommand,
@@ -190,47 +208,47 @@ fn translate_result(
                     ExitStatus::Exited(s) => {
                         CommandResult::StandardResult {
                             command: command.clone(),
-                            stdout: res.stdout_str(),
-                            stderr: res.stderr_str(),
-                            exit_code: exit_code,
+                            stdout: from_utf8_lossy(res.stdout),
+                            stderr: from_utf8_lossy(res.stderr),
+                            exit_code: s.to_owned(),
                         }
                     },
-                    ExitStatus::Signaled(i) =>
+                    ExitStatus::Signaled(s) =>
                         CommandResult::IrregularExitCode {
                             command: command.clone(),
-                            stdout: res.stdout_str(),
-                            stderr: res.stderr_str(),
-                            exit_code: format!("Signaled({})", i),
+                            stdout: from_utf8_lossy(res.stdout),
+                            stderr: from_utf8_lossy(res.stderr),
+                            exit_code: format!("Signaled({})", s),
                         },
-                    ExitStatus::Other(i) =>
+                    ExitStatus::Other(s) =>
                         CommandResult::IrregularExitCode {
                             command: command.clone(),
-                            stdout: res.stdout_str(),
-                            stderr: res.stderr_str(),
-                            exit_code: format!("Other({})", i),
+                            stdout: from_utf8_lossy(res.stdout),
+                            stderr: from_utf8_lossy(res.stderr),
+                            exit_code: format!("Other({})", s),
                         },
                     ExitStatus::Undetermined => 
                         CommandResult::IrregularExitCode {
                             command: command.clone(),
-                            stdout: res.stdout_str(),
-                            stderr: res.stderr_str(),
+                            stdout: from_utf8_lossy(res.stdout),
+                            stderr: from_utf8_lossy(res.stderr),
                             exit_code: "Undetermined".to_string(),
                         },
                 },
                 None => {
                     //Timeout Occurred
                     CommandResult::Timeout {
-                        command: command,
-                        stdout: res.stdout_str(),
-                        stderr: res.stderr_str(),
-                    },
-                }
+                        command: command.clone(),
+                        stdout: from_utf8_lossy(res.stdout),
+                        stderr: from_utf8_lossy(res.stderr),
+                    }
+                },
             }
         },
         Err(e) => 
             CommandResult::OsError {
                 command: command.clone(),
-                unknown_error: Some(format!("OS error occured: {}", e)),
+                error: format!("OS error occured: {}", e),
             }
     }
 }

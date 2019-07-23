@@ -84,34 +84,34 @@ impl CommandSetResult {
 // }
 pub enum CommandResult {
     OsError {
-        pub command: ExecutableCommand,
-        pub error: String,
+        command: ExecutableCommand,
+        error: String,
     },
     Timeout {
-        pub command: ExecutableCommand,
-        pub stdout: String,
-        pub stderr: String,
+        command: ExecutableCommand,
+        stdout: String,
+        stderr: String,
     },
     IrregularExitCode {
-        pub command: ExecutableCommand,
-        pub stdout: String,
-        pub stderr: String,
-        pub exit_code: String,
+        command: ExecutableCommand,
+        stdout: String,
+        stderr: String,
+        exit_code: String,
     },
     StandardResult {
-        pub command: ExecutableCommand,
-        pub stdout: String,
-        pub stderr: String,
-        pub exit_code: i32,
+        command: ExecutableCommand,
+        stdout: String,
+        stderr: String,
+        exit_code: u32,
     },
 }
 impl CommandResult {
     pub fn success(&self) -> bool {
         match self {
-            CommandResult::OsError{} => false,
-            CommandResult::Timeout{} => false,
-            CommandResult::IrregularExitCode{} => false,
-            CommandResult::StandardResult{exit_code} => exit_code == 0,
+            CommandResult::OsError{command: _, error: _} => false,
+            CommandResult::Timeout{command: _, stdout: _, stderr: _} => false,
+            CommandResult::IrregularExitCode{command: _, stdout: _, stderr: _, exit_code: _} => false,
+            CommandResult::StandardResult{command: _, stdout: _, stderr: _, exit_code} => exit_code.eq(&0),
         }
     }
 }
