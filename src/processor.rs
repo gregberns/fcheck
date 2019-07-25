@@ -6,6 +6,7 @@ use std::io::Read;
 use std::thread;
 use std::thread::{JoinHandle};
 use std::io::BufReader;
+use std::io::Result as IoResult;
 
 use subprocess::{
     Exec, 
@@ -210,75 +211,109 @@ fn start_process<S: AsRef<OsStr>>(timeout: Duration, args: &[S])
 
     // p.stdout
 
-    // let thread_stdout = &p.stdout;
-    // let mut thread_stderr = &p.stderr;
-    
-    let handle = thread::spawn(move || {
-        println!("Start communicate_bytes");
-        // -> IoResult<(Option<Vec<u8>>, Option<Vec<u8>>)>
-        // let (maybe_out, maybe_err) = p.communicate_bytes(None).unwrap();
-
-        // let out = p.stdout.map(|f| {
-        //     let mut buffer = Vec::new();
-            
-        //     // let mut reader = BufReader::new(f);
-        //     // let len = reader.read_to_end(&mut buffer).unwrap();
-
-        //     // f.read_to_end(&mut buffer).unwrap();
-        //     buffer = (&f).read_to_end().unwrap();
-        //     buffer
-        // }).unwrap_or_else(|| Vec::new());
-
-        let out = p.stdout.as_ref().map(|mut f| {
-            let mut buffer = Vec::new();
-            f.read_to_end(&mut buffer).unwrap();
-            buffer
-        }).unwrap_or_else(|| Vec::new());
-
-        // let err = thread_stderr.as_ref().map(|mut f| {
-        //     let mut buffer = Vec::new();
-        //     f.read_to_end(&mut buffer).unwrap();
-        //     buffer
-        // }).unwrap_or_else(|| Vec::new());
-
-        println!("End communicate_bytes");
-        // (maybe_out, maybe_err)
-        (out, Vec::new())
+    let (mut stdout, mut stderr) = (p.stdout.take().unwrap(), p.stderr.take().unwrap());
+    let out_handle: JoinHandle<Vec<u8>> = thread::spawn(move || {
+        let mut buffer = Vec::new();
+        stdout.read_to_end(&mut buffer).unwrap();
+        buffer
     });
+    let err_handle: JoinHandle<Vec<u8>> = thread::spawn(move || {
+        let mut buffer = Vec::new();
+        stderr.read_to_end(&mut buffer).unwrap();
+        buffer
+    });
+    // let err_handle: // ... same thing for stderr
+    // both threads are now running _in parallel_
+    let status = p.wait_timeout(timeout).unwrap();
+    let out = out_handle.join().unwrap();
+    let err = err_handle.join().unwrap();
+
+
+
+    // let thread_stdout = p.stdout.as_ref();
+    // // let mut thread_stderr = &p.stderr;
     
+    // let handle = thread::spawn(move || {
+    //     println!("Start communicate_bytes");
+    //     // -> IoResult<(Option<Vec<u8>>, Option<Vec<u8>>)>
+    //     // let (maybe_out, maybe_err) = p.communicate_bytes(None).unwrap();
 
-    // let mut p = Exec::cmd("sleep").arg("2").popen()?;
-    if let Some(status) = p.wait_timeout(Duration::new(1, 0))? {
-        println!("process finished as {:?}", status);
+    //     // let out = p.stdout.map(|f| {
+    //     //     let mut buffer = Vec::new();
+            
+    //     //     // let mut reader = BufReader::new(f);
+    //     //     // let len = reader.read_to_end(&mut buffer).unwrap();
+
+    //     //     // f.read_to_end(&mut buffer).unwrap();
+    //     //     buffer = (&f).read_to_end().unwrap();
+    //     //     buffer
+    //     // }).unwrap_or_else(|| Vec::new());
+
+    //     let out = thread_stdout.map(|mut f| {
+
+            
+
+    //         let mut buffer = Vec::new();
+    //         f.read_to_end(&mut buffer).unwrap();
+    //         buffer
+    //     }).unwrap_or_else(|| Vec::new());
+
+    //     // let err = thread_stderr.as_ref().map(|mut f| {
+    //     //     let mut buffer = Vec::new();
+    //     //     f.read_to_end(&mut buffer).unwrap();
+    //     //     buffer
+    //     // }).unwrap_or_else(|| Vec::new());
+
+    //     println!("End communicate_bytes");
+    //     // (maybe_out, maybe_err)
+    //     (out, Vec::new())
+    // });
+    
+    // let status = p.wait_timeout(Duration::new(1, 0))?;
+    // println!("process finished as {:?}", status);
+    // let (out, err) = handle.join().unwrap();
+
+    if status.is_none() {
+        p.kill()?;
+        p.wait()?;
+    }
+
+    Ok(CapturedData {
+        stdout: out, stderr: err, exit_status: status
+    })
+
+    // // let mut p = Exec::cmd("sleep").arg("2").popen()?;
+    // if let Some(status) = p.wait_timeout(Duration::new(1, 0))? {
+    //     println!("process finished as {:?}", status);
 
 
-        // let (maybe_out, maybe_err) = handle.join().unwrap();
+    //     // let (maybe_out, maybe_err) = handle.join().unwrap();
 
-        // let out = maybe_out.unwrap_or_else(Vec::new);
-        // let err = maybe_err.unwrap_or_else(Vec::new);
+    //     // let out = maybe_out.unwrap_or_else(Vec::new);
+    //     // let err = maybe_err.unwrap_or_else(Vec::new);
 
-        let (out, err) = handle.join().unwrap();
+    //     let (out, err) = handle.join().unwrap();
 
-        Ok(CapturedData {
-            stdout: out, stderr: err, exit_status: Some(status)
-        })
-    } else {
-        // p.kill()?;
-        // p.wait()?;
+    //     Ok(CapturedData {
+    //         stdout: out, stderr: err, exit_status: Some(status)
+    //     })
+    // } else {
+    //     // p.kill()?;
+    //     // p.wait()?;
 
-        let (out, err) = handle.join().unwrap();
-        // let (maybe_out, maybe_err) = handle.join().unwrap();
+    //     let (out, err) = handle.join().unwrap();
+    //     // let (maybe_out, maybe_err) = handle.join().unwrap();
 
-        // let out = maybe_out.unwrap_or_else(Vec::new);
-        // let err = maybe_err.unwrap_or_else(Vec::new);
+    //     // let out = maybe_out.unwrap_or_else(Vec::new);
+    //     // let err = maybe_err.unwrap_or_else(Vec::new);
 
-        Ok(CapturedData {
-            stdout: out, stderr: err, exit_status: None
-        })
+    //     Ok(CapturedData {
+    //         stdout: out, stderr: err, exit_status: None
+    //     })
 
 
         // println!("process killed");
-    }
+    // }
 
 
     // let status = p.wait_timeout(timeout)?;
@@ -339,7 +374,7 @@ fn test_sleep_with_timeout_fails() {
 
     let status = p.wait_timeout(timeout).unwrap();
 
-    let (out, err) = handle.join().unwrap();
+    // let (out, err) = handle.join().unwrap();
 
     //Other details here...
     //if status == None
