@@ -1,3 +1,5 @@
+#![feature(result_map_or_else)]
+ 
 use std::fs;
 use std::path::Path;
 use std::ffi::OsStr;

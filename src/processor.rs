@@ -162,8 +162,8 @@ pub fn run_command(command: &ExecutableCommand) -> CommandResult {
 }
 
 struct CapturedData {
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
+    stdout: IoResult<Vec<u8>>,
+    stderr: IoResult<Vec<u8>>,
     exit_status: Option<ExitStatus>,
 }
 
@@ -185,93 +185,21 @@ fn start_process<S: AsRef<OsStr>>(timeout: Duration, args: &[S])
             ..Default::default()
         })?;
 
-    // println!("Start communicate_bytes");    
-    // // -> IoResult<(Option<Vec<u8>>, Option<Vec<u8>>)>
-    // let (maybe_out, maybe_err) = p.communicate_bytes(None)?;
-    // println!("End communicate_bytes");
-    
-    // let out = maybe_out.unwrap_or_else(Vec::new);
-    // let err = maybe_err.unwrap_or_else(Vec::new);
-    
-    
-    // returns `Ok(None)` if the timeout is known to have elapsed.
-    
-
-    // These compile, but nothing is returned from each one
-    // let out = p.stdout.as_ref().map(|mut f| {
-    //         let mut buffer = Vec::new();
-    //         f.read_to_end(&mut buffer).unwrap();
-    //         buffer
-    //     }).unwrap_or_else(|| Vec::new());
-    // let err = p.stderr.as_ref().map(|mut f| {
-    //         let mut buffer = Vec::new();
-    //         f.read_to_end(&mut buffer).unwrap();
-    //         buffer
-    //     }).unwrap_or_else(|| Vec::new());
-
-    // p.stdout
-
     let (mut stdout, mut stderr) = (p.stdout.take().unwrap(), p.stderr.take().unwrap());
-    let out_handle: JoinHandle<Vec<u8>> = thread::spawn(move || {
+    let out_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
         let mut buffer = Vec::new();
-        stdout.read_to_end(&mut buffer).unwrap();
-        buffer
+        stdout.read_to_end(&mut buffer)?;
+        Ok(buffer)
     });
-    let err_handle: JoinHandle<Vec<u8>> = thread::spawn(move || {
+    let err_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
         let mut buffer = Vec::new();
-        stderr.read_to_end(&mut buffer).unwrap();
-        buffer
+        stderr.read_to_end(&mut buffer)?;
+        Ok(buffer)
     });
-    // let err_handle: // ... same thing for stderr
     // both threads are now running _in parallel_
     let status = p.wait_timeout(timeout).unwrap();
     let out = out_handle.join().unwrap();
     let err = err_handle.join().unwrap();
-
-
-
-    // let thread_stdout = p.stdout.as_ref();
-    // // let mut thread_stderr = &p.stderr;
-    
-    // let handle = thread::spawn(move || {
-    //     println!("Start communicate_bytes");
-    //     // -> IoResult<(Option<Vec<u8>>, Option<Vec<u8>>)>
-    //     // let (maybe_out, maybe_err) = p.communicate_bytes(None).unwrap();
-
-    //     // let out = p.stdout.map(|f| {
-    //     //     let mut buffer = Vec::new();
-            
-    //     //     // let mut reader = BufReader::new(f);
-    //     //     // let len = reader.read_to_end(&mut buffer).unwrap();
-
-    //     //     // f.read_to_end(&mut buffer).unwrap();
-    //     //     buffer = (&f).read_to_end().unwrap();
-    //     //     buffer
-    //     // }).unwrap_or_else(|| Vec::new());
-
-    //     let out = thread_stdout.map(|mut f| {
-
-            
-
-    //         let mut buffer = Vec::new();
-    //         f.read_to_end(&mut buffer).unwrap();
-    //         buffer
-    //     }).unwrap_or_else(|| Vec::new());
-
-    //     // let err = thread_stderr.as_ref().map(|mut f| {
-    //     //     let mut buffer = Vec::new();
-    //     //     f.read_to_end(&mut buffer).unwrap();
-    //     //     buffer
-    //     // }).unwrap_or_else(|| Vec::new());
-
-    //     println!("End communicate_bytes");
-    //     // (maybe_out, maybe_err)
-    //     (out, Vec::new())
-    // });
-    
-    // let status = p.wait_timeout(Duration::new(1, 0))?;
-    // println!("process finished as {:?}", status);
-    // let (out, err) = handle.join().unwrap();
 
     if status.is_none() {
         p.kill()?;
@@ -282,62 +210,6 @@ fn start_process<S: AsRef<OsStr>>(timeout: Duration, args: &[S])
         stdout: out, stderr: err, exit_status: status
     })
 
-    // // let mut p = Exec::cmd("sleep").arg("2").popen()?;
-    // if let Some(status) = p.wait_timeout(Duration::new(1, 0))? {
-    //     println!("process finished as {:?}", status);
-
-
-    //     // let (maybe_out, maybe_err) = handle.join().unwrap();
-
-    //     // let out = maybe_out.unwrap_or_else(Vec::new);
-    //     // let err = maybe_err.unwrap_or_else(Vec::new);
-
-    //     let (out, err) = handle.join().unwrap();
-
-    //     Ok(CapturedData {
-    //         stdout: out, stderr: err, exit_status: Some(status)
-    //     })
-    // } else {
-    //     // p.kill()?;
-    //     // p.wait()?;
-
-    //     let (out, err) = handle.join().unwrap();
-    //     // let (maybe_out, maybe_err) = handle.join().unwrap();
-
-    //     // let out = maybe_out.unwrap_or_else(Vec::new);
-    //     // let err = maybe_err.unwrap_or_else(Vec::new);
-
-    //     Ok(CapturedData {
-    //         stdout: out, stderr: err, exit_status: None
-    //     })
-
-
-        // println!("process killed");
-    // }
-
-
-    // let status = p.wait_timeout(timeout)?;
-    // println!("End");
-
-
-    // let out = match p.stdout.as_ref() {
-    //     Some(mut f) => {
-    //         let mut buffer = Vec::new();
-    //         f.read_to_end(&mut buffer).unwrap();
-    //         buffer
-    //     },
-    //     None => Vec::new()
-    // };
-
-    
-
-    // let err = p.stderr.unwrap_or_else(Vec::new);
-
-
-
-    // Ok(CapturedData {
-    //     stdout: out, stderr: err, exit_status: status
-    // })
 }
 
 // #[test]
@@ -349,8 +221,8 @@ fn start_process<S: AsRef<OsStr>>(timeout: Duration, args: &[S])
 #[test]
 fn test_sleep_with_timeout_fails() {
     
-    let timeout = Duration::from_millis(5);
-    let args = &vec!("sh", "-c", "sleep 5");
+    let timeout = Duration::from_millis(100);
+    let args = &vec!("sh", "-c", "echo hello && sleep 1");
 
     let mut p = Popen::create(
         args, 
@@ -360,26 +232,30 @@ fn test_sleep_with_timeout_fails() {
             ..Default::default()
         }).unwrap();
 
-    // let handle: JoinHandle<(Vec<u8>, Vec<u8>)> = thread::spawn(move || {
-    //     // Can't figure out how to access `p.stdout` here
-    //     let out = p.stdout.as_ref().map(|mut f| {
-    //         let mut buffer = Vec::new();
-    //         //And there are issues reading from mut file from immutible ref
-    //         f.read_to_end(&mut buffer).unwrap();
-    //         buffer
-    //     }).unwrap_or_else(|| Vec::new());
-    //     //stderr excluded...
-    //     (out, Vec::new())
-    // });
-
+    let (mut stdout, mut stderr) = (p.stdout.take().unwrap(), p.stderr.take().unwrap());
+    let out_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
+        let mut buffer = Vec::new();
+        stdout.read_to_end(&mut buffer)?;
+        Ok(buffer)
+    });
+    let err_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
+        let mut buffer = Vec::new();
+        stderr.read_to_end(&mut buffer)?;
+        Ok(buffer)
+    });
+    // both threads are now running _in parallel_
     let status = p.wait_timeout(timeout).unwrap();
+    let out = out_handle.join().unwrap();
+    let err = err_handle.join().unwrap();
 
-    // let (out, err) = handle.join().unwrap();
+    assert!(status.is_none());
 
-    //Other details here...
-    //if status == None
-    // p.kill()?;
-    // p.wait()?;
+    if status.is_none() {
+        p.kill().unwrap();
+        p.wait().unwrap();
+    }
+
+    assert_eq!("hello\n", String::from_utf8(out.unwrap()).unwrap());
 }
 
 fn translate_result(
@@ -388,36 +264,42 @@ fn translate_result(
     -> CommandResult {
     match result {
         Ok(res) => {
+            let stdout = res.stdout
+                .map_or_else(|e| format!("Fcheck Error occured reading stdout. {}", e), 
+                    |v| from_utf8_lossy(v));
+            let stderr = res.stderr
+                .map_or_else(|e| format!("Fcheck Error occured reading stderr. {}", e), 
+                    |v| from_utf8_lossy(v));
             match res.exit_status {
                 Some(exit_status) => match exit_status {
                     // https://docs.rs/subprocess/0.1.18/subprocess/enum.ExitStatus.html
                     ExitStatus::Exited(s) => {
                         CommandResult::StandardResult {
                             command: command.clone(),
-                            stdout: from_utf8_lossy(res.stdout),
-                            stderr: from_utf8_lossy(res.stderr),
+                            stdout: stdout,
+                            stderr: stderr,
                             exit_code: s.to_owned(),
                         }
                     },
                     ExitStatus::Signaled(s) =>
                         CommandResult::IrregularExitCode {
                             command: command.clone(),
-                            stdout: from_utf8_lossy(res.stdout),
-                            stderr: from_utf8_lossy(res.stderr),
+                            stdout: stdout,
+                            stderr: stderr,
                             exit_code: format!("Signaled({})", s),
                         },
                     ExitStatus::Other(s) =>
                         CommandResult::IrregularExitCode {
                             command: command.clone(),
-                            stdout: from_utf8_lossy(res.stdout),
-                            stderr: from_utf8_lossy(res.stderr),
+                            stdout: stdout,
+                            stderr: stderr,
                             exit_code: format!("Other({})", s),
                         },
                     ExitStatus::Undetermined => 
                         CommandResult::IrregularExitCode {
                             command: command.clone(),
-                            stdout: from_utf8_lossy(res.stdout),
-                            stderr: from_utf8_lossy(res.stderr),
+                            stdout: stdout,
+                            stderr: stderr,
                             exit_code: "Undetermined".to_string(),
                         },
                 },
@@ -425,8 +307,8 @@ fn translate_result(
                     //Timeout Occurred
                     CommandResult::Timeout {
                         command: command.clone(),
-                        stdout: from_utf8_lossy(res.stdout),
-                        stderr: from_utf8_lossy(res.stderr),
+                        stdout: stdout,
+                        stderr: stderr,
                     }
                 },
             }
