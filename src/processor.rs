@@ -1,6 +1,12 @@
-// use std::str::{from_utf8};
+use std::str::{from_utf8};
 use std::time::Duration;
 use std::ffi::{OsStr, OsString};
+use std::fmt::Display;
+use std::io::Read;
+use std::thread;
+use std::thread::{JoinHandle};
+use std::io::BufReader;
+
 use subprocess::{
     Exec, 
     CaptureData, 
@@ -13,9 +19,9 @@ use subprocess::{
 
 use crate::model::{
     ProcessingModule, 
-    // ProcessingKind, 
+    ProcessingKind, 
     CommandFamily, 
-    // CommandSetType, 
+    CommandSetType, 
     CommandSet,
     ExecutableCommand,
     CommandResult,
@@ -138,9 +144,12 @@ pub fn run_command(command: &ExecutableCommand) -> CommandResult {
     //         .capture();
 
     // let timeout = Duration::from_millis(command.timeout);
-    let timeout = Duration::from_millis(0);
+    let timeout = Duration::from_millis(500);
 
+    println!("Start start_process");
     let res_data = start_process(timeout, &vec!("sh", "-c", &command.cmd));
+    // let res_data = start_process(timeout, &vec!(&command.cmd));
+    println!("End start_process");
 
     translate_result(&command, res_data)
 
@@ -149,33 +158,6 @@ pub fn run_command(command: &ExecutableCommand) -> CommandResult {
     //     * If a bad one is returned, then include that in a 'uncommon' error
     // * Return a result where errors are 'uncommon' errors
 
-    // match res_data {
-    //     Ok(res) => {
-    //         let exit_code = match res.exit_status {
-    //             // https://docs.rs/subprocess/0.1.18/subprocess/enum.ExitStatus.html
-    //             ExitStatus::Exited(i) => i.to_string(),
-    //             ExitStatus::Signaled(i) => format!("Signaled({})", i),
-    //             ExitStatus::Other(i) => format!("Other({})", i),
-    //             ExitStatus::Undetermined => "Undetermined".to_string(),
-    //         };
-
-    //         CommandResult {
-    //             command: command.clone(),
-    //             stdout: res.stdout_str(),
-    //             stderr: res.stderr_str(),
-    //             exit_code: exit_code,
-    //             unknown_error: Option::None,
-    //         }
-    //     },
-    //     Err(e) => 
-    //         CommandResult {
-    //             command: command.clone(),
-    //             stdout: "".to_string(),
-    //             stderr: "".to_string(),
-    //             exit_code: "-1".to_string(),
-    //             unknown_error: Some(format!("Unknown error occured: {}", e)),
-    //         }
-    // }
 }
 
 struct CapturedData {
@@ -184,16 +166,185 @@ struct CapturedData {
     exit_status: Option<ExitStatus>,
 }
 
-// pub struct CommandResult {
-//     pub command: ExecutableCommand,
-//     pub stdout: String,
-//     pub stderr: String,
-//     pub exit_code: String,
-//     pub unknown_error: Option<String>,
+fn start_process<S: AsRef<OsStr>>(timeout: Duration, args: &[S]) 
+    -> Result<CapturedData, PopenError> {
+
+    println!("Popen::create");
+    let mut p = Popen::create(
+        args, 
+        PopenConfig {
+            stdin: Redirection::None,
+            stdout: Redirection::Pipe,
+            stderr: Redirection::Pipe,
+
+            //pub executable: Option<OsString>,
+            // executable: Some(OsString::from("/bin/bash".to_string())),
+            // executable: Some(OsString::from("sh -c".to_string())),
+            
+            ..Default::default()
+        })?;
+
+    // println!("Start communicate_bytes");    
+    // // -> IoResult<(Option<Vec<u8>>, Option<Vec<u8>>)>
+    // let (maybe_out, maybe_err) = p.communicate_bytes(None)?;
+    // println!("End communicate_bytes");
+    
+    // let out = maybe_out.unwrap_or_else(Vec::new);
+    // let err = maybe_err.unwrap_or_else(Vec::new);
+    
+    
+    // returns `Ok(None)` if the timeout is known to have elapsed.
+    
+
+    // These compile, but nothing is returned from each one
+    // let out = p.stdout.as_ref().map(|mut f| {
+    //         let mut buffer = Vec::new();
+    //         f.read_to_end(&mut buffer).unwrap();
+    //         buffer
+    //     }).unwrap_or_else(|| Vec::new());
+    // let err = p.stderr.as_ref().map(|mut f| {
+    //         let mut buffer = Vec::new();
+    //         f.read_to_end(&mut buffer).unwrap();
+    //         buffer
+    //     }).unwrap_or_else(|| Vec::new());
+
+    // p.stdout
+
+    // let thread_stdout = &p.stdout;
+    // let mut thread_stderr = &p.stderr;
+    
+    let handle = thread::spawn(move || {
+        println!("Start communicate_bytes");
+        // -> IoResult<(Option<Vec<u8>>, Option<Vec<u8>>)>
+        // let (maybe_out, maybe_err) = p.communicate_bytes(None).unwrap();
+
+        // let out = p.stdout.map(|f| {
+        //     let mut buffer = Vec::new();
+            
+        //     // let mut reader = BufReader::new(f);
+        //     // let len = reader.read_to_end(&mut buffer).unwrap();
+
+        //     // f.read_to_end(&mut buffer).unwrap();
+        //     buffer = (&f).read_to_end().unwrap();
+        //     buffer
+        // }).unwrap_or_else(|| Vec::new());
+
+        let out = p.stdout.as_ref().map(|mut f| {
+            let mut buffer = Vec::new();
+            f.read_to_end(&mut buffer).unwrap();
+            buffer
+        }).unwrap_or_else(|| Vec::new());
+
+        // let err = thread_stderr.as_ref().map(|mut f| {
+        //     let mut buffer = Vec::new();
+        //     f.read_to_end(&mut buffer).unwrap();
+        //     buffer
+        // }).unwrap_or_else(|| Vec::new());
+
+        println!("End communicate_bytes");
+        // (maybe_out, maybe_err)
+        (out, Vec::new())
+    });
+    
+
+    // let mut p = Exec::cmd("sleep").arg("2").popen()?;
+    if let Some(status) = p.wait_timeout(Duration::new(1, 0))? {
+        println!("process finished as {:?}", status);
+
+
+        // let (maybe_out, maybe_err) = handle.join().unwrap();
+
+        // let out = maybe_out.unwrap_or_else(Vec::new);
+        // let err = maybe_err.unwrap_or_else(Vec::new);
+
+        let (out, err) = handle.join().unwrap();
+
+        Ok(CapturedData {
+            stdout: out, stderr: err, exit_status: Some(status)
+        })
+    } else {
+        // p.kill()?;
+        // p.wait()?;
+
+        let (out, err) = handle.join().unwrap();
+        // let (maybe_out, maybe_err) = handle.join().unwrap();
+
+        // let out = maybe_out.unwrap_or_else(Vec::new);
+        // let err = maybe_err.unwrap_or_else(Vec::new);
+
+        Ok(CapturedData {
+            stdout: out, stderr: err, exit_status: None
+        })
+
+
+        // println!("process killed");
+    }
+
+
+    // let status = p.wait_timeout(timeout)?;
+    // println!("End");
+
+
+    // let out = match p.stdout.as_ref() {
+    //     Some(mut f) => {
+    //         let mut buffer = Vec::new();
+    //         f.read_to_end(&mut buffer).unwrap();
+    //         buffer
+    //     },
+    //     None => Vec::new()
+    // };
+
+    
+
+    // let err = p.stderr.unwrap_or_else(Vec::new);
+
+
+
+    // Ok(CapturedData {
+    //     stdout: out, stderr: err, exit_status: status
+    // })
+}
+
+// #[test]
+// fn test_sleep_with_timeout_works() {
+//     let timeout = Duration::from_millis(5);
+//     let res_data = start_process(timeout, &vec!("sh", "-c", "sleep 5"));
 // }
 
-fn from_utf8_lossy(vec_byte: Vec<u8>) -> String {
-    String::from_utf8_lossy(&vec_byte).into_owned()
+#[test]
+fn test_sleep_with_timeout_fails() {
+    
+    let timeout = Duration::from_millis(5);
+    let args = &vec!("sh", "-c", "sleep 5");
+
+    let mut p = Popen::create(
+        args, 
+        PopenConfig {
+            stdout: Redirection::Pipe,
+            stderr: Redirection::Pipe,
+            ..Default::default()
+        }).unwrap();
+
+    // let handle: JoinHandle<(Vec<u8>, Vec<u8>)> = thread::spawn(move || {
+    //     // Can't figure out how to access `p.stdout` here
+    //     let out = p.stdout.as_ref().map(|mut f| {
+    //         let mut buffer = Vec::new();
+    //         //And there are issues reading from mut file from immutible ref
+    //         f.read_to_end(&mut buffer).unwrap();
+    //         buffer
+    //     }).unwrap_or_else(|| Vec::new());
+    //     //stderr excluded...
+    //     (out, Vec::new())
+    // });
+
+    let status = p.wait_timeout(timeout).unwrap();
+
+    let (out, err) = handle.join().unwrap();
+
+    //Other details here...
+    //if status == None
+    // p.kill()?;
+    // p.wait()?;
 }
 
 fn translate_result(
@@ -253,61 +404,9 @@ fn translate_result(
     }
 }
 
-fn start_process<S: AsRef<OsStr>>(timeout: Duration, args: &[S]) 
-    -> Result<CapturedData, PopenError> {
-
-    let mut p = Popen::create(
-        args, 
-        PopenConfig {
-            stdout: Redirection::Pipe,
-            stderr: Redirection::Pipe,
-            ..Default::default()
-        })?;
-    // -> IoResult<(Option<Vec<u8>>, Option<Vec<u8>>)>
-    let (maybe_out, maybe_err) = p.communicate_bytes(None)?;
-    let out = maybe_out.unwrap_or_else(Vec::new);
-    let err = maybe_err.unwrap_or_else(Vec::new);
-    
-    // returns `Ok(None)` if the timeout is known to have elapsed.
-    let status = p.wait_timeout(timeout)?;
-
-
-    Ok(CapturedData {
-        stdout: out, stderr: err, exit_status: status
-    })
+fn from_utf8_lossy(vec_byte: Vec<u8>) -> String {
+    String::from_utf8_lossy(&vec_byte).into_owned()
 }
-
-// #[test]
-// fn wait_timeout() {
-
-//     start_process(Duration::from_millis(100), &["sleep", "0.5"]);
-
-
-
-//     let mut p = Popen::create(&["sleep", "0.5"], 
-//         PopenConfig {
-//             stdout: Redirection::Pipe,
-//             ..Default::default()
-//         })
-//         .unwrap();
-
-//     p.wait_timeout(Duration::from_millis(100)).unwrap()
-
-// // let mut p = Popen::create(&["sh", "-c", r#"test "$SOMEVAR" = "bar""#],
-// //                               PopenConfig {
-// //                                   stdout: Redirection::Pipe,
-// //                                   env: Some(dups),
-// //                                   ..Default::default()
-// //                               }).unwrap();
-// //     assert!(p.wait().unwrap().success());
-
-
-
-//     let ret = p.wait_timeout(Duration::from_millis(100)).unwrap();
-//     assert!(ret.is_none());
-//     let ret = p.wait_timeout(Duration::from_millis(450)).unwrap();
-//     assert_eq!(ret, Some(ExitStatus::Exited(0)));
-// }
 
 #[test]
 fn t_exec_simple() {
@@ -319,11 +418,15 @@ fn t_exec_simple() {
 
     let res = run_command(&cmd);
 
-    assert_eq!(res.command, cmd);
-    assert_eq!(from_utf8(&res.stdout), Ok("Hello\n"));
-    assert_eq!(res.stderr, Vec::new());
-    assert_eq!(res.exit_code, "0".to_string());
-    assert_eq!(res.unknown_error, Option::None);
+    match res {
+        CommandResult::StandardResult {command, stdout, stderr, exit_code} => {
+            assert_eq!(command, cmd);
+            assert_eq!(stdout, "Hello\n");
+            assert_eq!(stderr, "");
+            assert_eq!(exit_code, 0);
+        },
+        _ => panic!("Fail")
+    }
 }
 
 #[test]
@@ -339,11 +442,15 @@ fn t_exec_multiline() {
 
     let res = run_command(&cmd);
 
-    assert_eq!(res.command, cmd);
-    assert_eq!(from_utf8(&res.stdout), Ok("Hello\nhello\n"));
-    assert_eq!(res.stderr, Vec::new());
-    assert_eq!(res.exit_code, "0".to_string());
-    assert_eq!(res.unknown_error, Option::None);
+    match res {
+        CommandResult::StandardResult {command, stdout, stderr, exit_code} => {
+            assert_eq!(command, cmd);
+            assert_eq!(stdout, "Hello\nhello\n");
+            assert_eq!(stderr, "");
+            assert_eq!(exit_code, 0);
+        },
+        _ => panic!("Fail")
+    }
 }
 
 #[test]
@@ -360,18 +467,22 @@ fn t_exec_runs_with_bash() {
     };
 
     let res = run_command(&cmd);
-
-    assert_eq!(res.command, cmd);
-    assert_eq!(from_utf8(&res.stdout), Ok("0\n1\n2\n"));
-    assert_eq!(res.stderr, Vec::new());
-    assert_eq!(res.exit_code, "0".to_string());
-    assert_eq!(res.unknown_error, Option::None);
+    match res {
+        CommandResult::StandardResult {command, stdout, stderr, exit_code} => {
+            assert_eq!(command, cmd);
+            assert_eq!(stdout, "0\n1\n2\n");
+            assert_eq!(stderr, "");
+            assert_eq!(exit_code, 0);
+        },
+        _ => panic!("Fail")
+    }
 }
 
 
 #[test]
 fn t_execset_simple() {
     let cmds = CommandSet {
+        name: None,
         set_type: CommandSetType::Test,
         commands: vec!(
             ExecutableCommand {
@@ -396,6 +507,7 @@ fn t_execset_simple() {
 #[test]
 fn t_execset_stop_on_failure() {
     let cmds = CommandSet {
+        name: None,
         set_type: CommandSetType::Test,
         commands: vec!(
             ExecutableCommand {

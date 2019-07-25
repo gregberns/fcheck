@@ -93,6 +93,8 @@ fn main() {
     // ~~Add full success of module~~
     // Timeouts
     //  * 0 should be 'no timeout'
+    //  * pass timeouts from config
+    // Pass in default shell
     // Stop early if Setup fails
     // Add module name
 
