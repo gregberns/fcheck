@@ -25,17 +25,6 @@ pub struct TestOutput {
     commands: Vec<CommandOutput>,
 }
 
-// #[derive(Serialize, Debug, PartialEq)]
-// pub struct CommandOutput {
-//     pub name: Option<String>,
-//     pub result: String,
-//     pub command: String,
-//     pub stdout: String,
-//     pub stderr: String,
-//     pub exit_code: String,
-//     pub error: Option<String>,
-// }
-
 #[derive(Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum CommandOutput {
@@ -105,9 +94,7 @@ fn map_test(set: &CommandSetResult) -> TestOutput {
 }
 
 fn map_command(res: &CommandResult) -> CommandOutput {
-    // let name = res.command.name.clone();
     let result = result_to_string(res.success());
-    // let command = res.command.cmd.clone();
 
     match res {
         CommandResult::OsError {command, error} => CommandOutput::OsError {
@@ -148,15 +135,6 @@ fn map_command(res: &CommandResult) -> CommandOutput {
             exit_code: exit_code.clone(),
         },
     }
-    // CommandOutput {
-    //     name: res.command.name.clone(),
-    //     result: result_to_string(res.success()),
-    //     command: res.command.cmd.clone(),
-    //     stdout: res.stdout.clone(),
-    //     stderr: res.stderr.clone(),
-    //     exit_code: res.exit_code.clone(),
-    //     unknown_error: res.unknown_error.clone(),
-    // }
 }
 
 pub fn to_json(module: &ModuleOutput) -> String {

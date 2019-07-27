@@ -175,30 +175,7 @@ fn start_process<S: AsRef<OsStr>>(timeout: Option<Duration>, args: &[S])
     }
 
     let out_handle: JoinHandle<IoResult<Vec<u8>>> = spawn_thread(stdout);
-        // thread::spawn(move || {
-        //     let mut buffer = Vec::new();
-        //     stdout.read_to_end(&mut buffer)?;
-        //     Ok(buffer)
-        // });
-
-    // let out_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
-    //     let mut buffer = Vec::new();
-    //     stdout.read_to_end(&mut buffer)?;
-    //     Ok(buffer)
-    // });
-
     let err_handle: JoinHandle<IoResult<Vec<u8>>> = spawn_thread(stderr);
-        // thread::spawn(move || {
-        //     let mut buffer = Vec::new();
-        //     stderr.read_to_end(&mut buffer)?;
-        //     Ok(buffer)
-        // });
-
-    // let err_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
-    //     let mut buffer = Vec::new();
-    //     stderr.read_to_end(&mut buffer)?;
-    //     Ok(buffer)
-    // });
 
     // both threads are now running _in parallel_
     let status: Result<Option<ExitStatus>, RunProcessError> = match timeout {
@@ -208,38 +185,6 @@ fn start_process<S: AsRef<OsStr>>(timeout: Option<Duration>, args: &[S])
                     .map(|e| Some(e))
                     .map_err(|err| RunProcessError::ProcessRuntimeError(err.to_string())),
     };
-
-// std::option::Option<
-//     std::result::Result<
-//         std::result::Result<
-//             std::vec::Vec<_>, std::io::Error>,
-//         std::boxed::Box<dyn std::any::Any + std::marker::Send>>>
-
-
-
-    // fn collapse(msg: &str,
-    //             opt_handle: 
-    //                 std::option::Option<
-    //                     std::result::Result<
-    //                         std::result::Result<
-    //                             std::vec::Vec<u8>, std::io::Error>,
-    //                         std::boxed::Box<dyn std::any::Any + std::marker::Send>>>,
-    //             ) -> std::option::Option<std::result::Result<std::vec::Vec<u8>, std::string::String>>
-    //             {
-    //     opt_handle
-    //         .map(|o| 
-    //             o.join()
-    //                 // Convert `std::vec::Vec<_>, std::io::Error`
-    //                 //      to `std::vec::Vec<_>, std::string::String`
-    //                 .map(|i| i.map_err(|err| format!("{} std::io::Error {}", msg, err)))
-    //                 // Convert `std::boxed::Box<dyn std::any::Any + std::marker::Send>`
-    //                 //      to `std::string::String`
-    //                 .map_err(|err| format!("{} thread paniced. Error: {:?}", msg, err))
-    //                 // flatten `Result<Result<_, String>, String>`
-    //                 //      to `Result<_, String>`
-    //                 .and_then(|i| i)
-    //                 )
-    // }
 
     fn collapse(result:
                     std::result::Result<
@@ -259,34 +204,7 @@ fn start_process<S: AsRef<OsStr>>(timeout: Option<Duration>, args: &[S])
     }
 
     let out = collapse(out_handle.join());
-    // let out = out_handle
-    //     .map(|o| 
-    //         o.join()
-    //             // Convert `std::vec::Vec<_>, std::io::Error`
-    //             //      to `std::vec::Vec<_>, std::string::String`
-    //             .map(|i| i.map_err(|err| format!("std::io::Error {}", err)))
-    //             // Convert `std::boxed::Box<dyn std::any::Any + std::marker::Send>`
-    //             //      to `std::string::String`
-    //             .map_err(|err| format!("stdout thread paniced. Error: {:?}", err))
-    //             // flatten `Result<Result<_, String>, String>`
-    //             //      to `Result<_, String>`
-    //             .and_then(|i| i)
-    //             );
-    // let err = collapse("stderr", err_handle.map(|e| e.join()));
     let err = collapse(err_handle.join());
-
-// std::option::Option<
-//     std::result::Result<
-//         std::result::Result<
-//             std::vec::Vec<_>, std::io::Error>,
-//         std::boxed::Box<dyn std::any::Any + std::marker::Send>>>
-
-// std::option::Option<
-//     std::result::Result<
-//         std::result::Result<
-//             std::vec::Vec<_>, std::io::Error>, 
-//         std::result::Result<_, std::string::String>>>
-
 
     // `status == Ok(None)` means a timeout occured
     if let Ok(st) = status {

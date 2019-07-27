@@ -189,7 +189,6 @@ fn t_setup_and_teardown_optional() {
     assert_eq!(config.teardown, Option::None);
 }
 
-
 #[test]
 fn t_parse_error() {
     let err: ParseError = parse_toml(r#"

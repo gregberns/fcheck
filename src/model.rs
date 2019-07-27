@@ -86,13 +86,6 @@ impl CommandSetResult {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-// pub struct CommandResult {
-//     pub command: ExecutableCommand,
-//     pub stdout: String,
-//     pub stderr: String,
-//     pub exit_code: String,
-//     pub unknown_error: Option<String>,
-// }
 pub enum CommandResult {
     OsError {
         command: ExecutableCommand,
