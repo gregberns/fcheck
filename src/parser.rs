@@ -1,7 +1,6 @@
-// use toml::Value;
-// use toml::de::Error;
 use serde_derive::Deserialize;
 use crate::model::{
+    Shell,
     ProcessingModule, 
     ProcessingKind, 
     CommandFamily, 
@@ -16,8 +15,17 @@ pub enum FileType {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct DefaultShell {
+    path: String,
+    args: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct TestModule {
     version: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shell: Option<DefaultShell>,
     
     #[serde(skip_serializing_if = "Option::is_none")]
     setup: Option<Vec<Command>>,
@@ -48,6 +56,9 @@ pub struct Command {
     
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timeout: Option<u64>,
     
     #[serde(alias = "cmd")]
     command: String,
@@ -59,7 +70,7 @@ pub struct ParseError {
   line_col: Option<(usize, usize)>,
 }
 
-/// Parse and return a ProcessingModule
+// Parse and return a ProcessingModule
 
 pub fn prepare_file(
     file_type: FileType, 
@@ -82,7 +93,7 @@ pub fn file_extension_to_filetype(ext: &str) -> Option<FileType> {
     }
 } 
 
-/// TOML Parser
+// TOML Parser
 
 fn parse_toml(config: String) -> Result<TestModule, ParseError> {
     toml::from_str(&config)
@@ -98,23 +109,14 @@ fn parse_toml(config: String) -> Result<TestModule, ParseError> {
 
 #[test]
 fn t_basics() {
-    // {
-    //   "version": "2",
-    //   "setup": [
-    //     { "cmd": "abc" },
-    //     { "cmd": "abc" }
-    //   ],
-    //   "tests": [
-    //     { "name": "test1",
-    //       "commands": [
-    //         { "name": "curl", "cmd": "curl google.com" }
-    //       ]
-    //     }
-    //   ]
-    // }
-
     let config = parse_toml(r#"
         version = "3"
+
+        [shell]
+        path = "/bin/bash"
+        args = [
+        "-c"
+        ]
 
         [[setup]]
         name = "setup 1"
@@ -126,6 +128,7 @@ fn t_basics() {
         name = "test 1"
         [[test.command]]
         name = "curl"
+        timeout = 1000
         cmd = "curl google.com"
         [[test.command]]
         name = "ping"
@@ -142,6 +145,12 @@ curl google.com"""
     "#.to_string()).unwrap();
 
     assert_eq!(config.version, "3");
+
+    assert!(config.shell.is_some());
+    config.shell.map(|shell| {
+        assert_eq!(shell.path, "/bin/bash");
+        assert_eq!(shell.args, vec!("-c"));
+    });
     
     config.setup.map(|a| {
         assert_eq!(a[0].name, Some("setup 1".to_string()));
@@ -151,6 +160,7 @@ curl google.com"""
 
     assert_eq!(config.tests[0].name, Some("test 1".to_string()));
     assert_eq!(config.tests[0].commands[0].name, Some("curl".to_string()));
+    assert_eq!(config.tests[0].commands[0].timeout, Some(1000));
     assert_eq!(config.tests[0].commands[0].command, "curl google.com");
     assert_eq!(config.tests[0].commands[1].name, Some("ping".to_string()));
     assert_eq!(config.tests[0].commands[1].command, "ping google.com;\ncurl google.com");
@@ -195,23 +205,29 @@ fn t_parse_error() {
         });
 }
 
-/// Maping from External API to Internal Model
+// Maping from External API to Internal Model
 
 fn testmodule_to_processingmodel(module: TestModule) -> ProcessingModule {
+    let shell = match module.shell {
+        Some(DefaultShell{path, args}) => Shell(path, args),
+        None => Shell("/bin/bash".to_string(), vec!("-c".to_string())),
+    };
+    
     ProcessingModule {
-        setup: commandlist_to_commandset(Some("Setup".to_string()), CommandSetType::Setup, module.setup),
-        tests: testlist_to_commandfamily(module.tests),
-        teardown: commandlist_to_commandset(Some("Teardown".to_string()), CommandSetType::Teardown, module.teardown),
+        shell: shell.clone(),
+        setup: commandlist_to_commandset(Some("Setup".to_string()), CommandSetType::Setup, &shell, module.setup),
+        tests: testlist_to_commandfamily(&shell, module.tests),
+        teardown: commandlist_to_commandset(Some("Teardown".to_string()), CommandSetType::Teardown, &shell, module.teardown),
     }
 }
 
-fn commandlist_to_commandset(name: Option<String>, c_type: CommandSetType, opt_commands: Option<Vec<Command>>) -> CommandSet {
+fn commandlist_to_commandset(name: Option<String>, c_type: CommandSetType, shell: &Shell, opt_commands: Option<Vec<Command>>) -> CommandSet {
     match opt_commands {
         Some(commands) => 
             CommandSet {
                 name: name,
                 set_type: c_type,
-                commands: commands.iter().map(|c| command_to_execommand(c)).collect(),
+                commands: commands.iter().map(|c| command_to_execommand(shell, c)).collect(),
                 processing_kind: ProcessingKind::Serial,
             },
         None => 
@@ -224,13 +240,13 @@ fn commandlist_to_commandset(name: Option<String>, c_type: CommandSetType, opt_c
     }
 }
 
-fn testlist_to_commandfamily(tests: Vec<Test>) -> CommandFamily {
+fn testlist_to_commandfamily(shell: &Shell, tests: Vec<Test>) -> CommandFamily {
     let command_sets = tests.iter()
         .map(|t| {
             CommandSet {
                 name: t.name.clone(),
                 set_type: CommandSetType::Test,
-                commands: t.commands.iter().map(|c| command_to_execommand(c)).collect(),
+                commands: t.commands.iter().map(|c| command_to_execommand(shell, c)).collect(),
                 processing_kind: ProcessingKind::Serial,
             }
         })
@@ -242,10 +258,12 @@ fn testlist_to_commandfamily(tests: Vec<Test>) -> CommandFamily {
     }
 }
 
-fn command_to_execommand(cmd: &Command) -> ExecutableCommand {
+fn command_to_execommand(shell: &Shell, cmd: &Command) -> ExecutableCommand {
     ExecutableCommand {
         name: cmd.name.clone(),
         description: cmd.description.clone(),
+        timeout: cmd.timeout.clone(),
+        shell: shell.clone(),
         cmd: cmd.command.clone(),
     }
 }
@@ -254,10 +272,12 @@ fn command_to_execommand(cmd: &Command) -> ExecutableCommand {
 fn t_map_module() {
     let res = testmodule_to_processingmodel(TestModule {
         version: "3".to_string(),
+        shell: None,
         setup: Some(vec!(
             Command {
                 name: Option::None,
                 description: Option::None,
+                timeout: None,
                 command: "abc".to_string(),
             }
         )),
@@ -269,6 +289,7 @@ fn t_map_module() {
                     Command {
                         name: Option::None,
                         description: Option::None,
+                        timeout: None,
                         command: "def".to_string(),
                     }
                 )
@@ -278,6 +299,7 @@ fn t_map_module() {
             Command {
                 name: Option::None,
                 description: Option::None,
+                timeout: None,
                 command: "ghi".to_string(),
             }
         )),
@@ -300,5 +322,4 @@ fn t_map_module() {
     assert_eq!(res.teardown.commands[0].description, Option::None);
     assert_eq!(res.teardown.commands[0].cmd, "ghi");
     assert_eq!(res.teardown.processing_kind, ProcessingKind::Serial);
-
 }

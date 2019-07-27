@@ -7,6 +7,7 @@ use std::thread;
 use std::thread::{JoinHandle};
 use std::io::BufReader;
 use std::io::Result as IoResult;
+use std::fs::File;
 
 use subprocess::{
     Exec, 
@@ -19,6 +20,7 @@ use subprocess::{
     };
 
 use crate::model::{
+    Shell,
     ProcessingModule, 
     ProcessingKind, 
     CommandFamily, 
@@ -31,35 +33,15 @@ use crate::model::{
     ProcessingModuleResult,
     };
 
+// To Do
+//     * If setup fails, don't run Tests
+//     * Support Dahl
+
 // New
 //     * Support running multiple config files
-// 
-// Read + Parse Config File
-//     * Support Toml
-//     * Support Dahl
-//     * Check there is only one Setup and Teardown and there are Tests
-// Run Processes
-//     * Run Setup, Tests, Teardown (CommandSet)
-//     * Handle Response
-//     * Write to Report JSON output
-//     * Write to Console in readable format
-// Run Setup (Optional) (CommandSet)
-//     * If setup fails, don't run Tests
-//     * Setup is like a Test but if it fails then stop
-// Run Teardown (Optional) (CommandSet)
-//     * Run all teardowns, even if one fails
-//     * Teardown is like a Test
-// Run Tests
-//     * Set of CommandSet (CommandFamily)
-//     * Run CommandSet Serially
 //     * Run CommandSet in Parallel
 //         * Control the paralelism, default to n
-// Run Test
-//     * CommandSet -> CommandSetResult 
-//     * CommandSetResult: { CommandResult <Vec<CommandResult>, Vec<CommandError>>
-//         * success :: () -> bool
-//         * errors :: () -> Vec<CommandError>
-//     * CommandResult :: { Command, StdOut, StdErr, ExitCode }
+//     * (Optional) Write to Console in readable format (Not JSON)
 
 
 pub fn run(module: &ProcessingModule) -> ProcessingModuleResult {
@@ -136,87 +118,192 @@ pub fn run_commandset(
 }
 
 pub fn run_command(command: &ExecutableCommand) -> CommandResult {
+    let timeout = command.timeout.map(|t| Duration::from_millis(t));
+    
+    let mut full_command = Vec::new();
+    full_command.push(command.shell.0.clone());
+    full_command.extend(command.shell.1.clone());
+    full_command.push(command.cmd.clone());
 
-    // Support Timeout
-
-    //This works, but doesn't support timeout or switching which shell to use
-    // let res_data: Result<CaptureData, PopenError> = 
-    //     Exec::shell(&command.cmd)
-    //         .capture();
-
-    // let timeout = Duration::from_millis(command.timeout);
-    let timeout = Duration::from_millis(500);
-
-    println!("Start start_process");
-    let res_data = start_process(timeout, &vec!("sh", "-c", &command.cmd));
-    // let res_data = start_process(timeout, &vec!(&command.cmd));
-    println!("End start_process");
+    let res_data = start_process(timeout, &full_command);
 
     translate_result(&command, res_data)
-
-    // This needs to be improved:
-    // * Return a valid exit_code
-    //     * If a bad one is returned, then include that in a 'uncommon' error
-    // * Return a result where errors are 'uncommon' errors
-
 }
 
 struct CapturedData {
-    stdout: IoResult<Vec<u8>>,
-    stderr: IoResult<Vec<u8>>,
-    exit_status: Option<ExitStatus>,
+    stdout: Result<Vec<u8>, RunProcessError>,
+    stderr: Result<Vec<u8>, RunProcessError>,
+    exit_status: Result<Option<ExitStatus>, RunProcessError>,
 }
 
-fn start_process<S: AsRef<OsStr>>(timeout: Duration, args: &[S]) 
-    -> Result<CapturedData, PopenError> {
+pub enum RunProcessError {
+    // ProcessCreateError - PopenConfig::create error - If the external program cannot be executed for any reason, an error is returned. The most typical reason for execution to fail is that the program is missing on the PATH, but other errors are also possible. Note that this is distinct from the program running and then exiting with a failure code - this can be detected by calling the wait method to obtain its exit status.
+    ProcessCreateError(String),
+    // Error from `wait_timeout` or `wait`
+    ProcessRuntimeError(String),
+    // RedirectReadFailed - `stderr.read_to_end` failed
+    RedirectReadFailed(String),
+    // Error when `thread.join()` called
+    ThreadJoinError(String),
+    //Fail to Kill process
+    KillProcessError(String),
+    KillWaitError(String),
+}
 
-    println!("Popen::create");
+fn start_process<S: AsRef<OsStr>>(timeout: Option<Duration>, args: &[S]) 
+    -> Result<CapturedData, RunProcessError> {
+
     let mut p = Popen::create(
         args, 
         PopenConfig {
             stdin: Redirection::None,
             stdout: Redirection::Pipe,
             stderr: Redirection::Pipe,
-
-            //pub executable: Option<OsString>,
-            // executable: Some(OsString::from("/bin/bash".to_string())),
-            // executable: Some(OsString::from("sh -c".to_string())),
-            
             ..Default::default()
-        })?;
+        })
+        .map_err(|err| RunProcessError::ProcessCreateError(err.to_string()))?;
 
-    let (mut stdout, mut stderr) = (p.stdout.take().unwrap(), p.stderr.take().unwrap());
-    let out_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
-        let mut buffer = Vec::new();
-        stdout.read_to_end(&mut buffer)?;
-        Ok(buffer)
-    });
-    let err_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
-        let mut buffer = Vec::new();
-        stderr.read_to_end(&mut buffer)?;
-        Ok(buffer)
-    });
+    // This should only fail if `Redirection::Pipe` is not defined in `PopenConfig`....I think
+    let (stdout, stderr) = (p.stdout.take().unwrap(), p.stderr.take().unwrap());
+
+    fn spawn_thread(mut redirect: File) -> JoinHandle<IoResult<Vec<u8>>> {
+        thread::spawn(move || {
+            let mut buffer = Vec::new();
+            redirect.read_to_end(&mut buffer)?;
+            Ok(buffer)
+        })
+    }
+
+    let out_handle: JoinHandle<IoResult<Vec<u8>>> = spawn_thread(stdout);
+        // thread::spawn(move || {
+        //     let mut buffer = Vec::new();
+        //     stdout.read_to_end(&mut buffer)?;
+        //     Ok(buffer)
+        // });
+
+    // let out_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
+    //     let mut buffer = Vec::new();
+    //     stdout.read_to_end(&mut buffer)?;
+    //     Ok(buffer)
+    // });
+
+    let err_handle: JoinHandle<IoResult<Vec<u8>>> = spawn_thread(stderr);
+        // thread::spawn(move || {
+        //     let mut buffer = Vec::new();
+        //     stderr.read_to_end(&mut buffer)?;
+        //     Ok(buffer)
+        // });
+
+    // let err_handle: JoinHandle<IoResult<Vec<u8>>> = thread::spawn(move || {
+    //     let mut buffer = Vec::new();
+    //     stderr.read_to_end(&mut buffer)?;
+    //     Ok(buffer)
+    // });
+
     // both threads are now running _in parallel_
-    let status = p.wait_timeout(timeout).unwrap();
-    let out = out_handle.join().unwrap();
-    let err = err_handle.join().unwrap();
+    let status: Result<Option<ExitStatus>, RunProcessError> = match timeout {
+        Some(timeout) => p.wait_timeout(timeout)
+                            .map_err(|err| RunProcessError::ProcessRuntimeError(err.to_string())),
+        None => p.wait()
+                    .map(|e| Some(e))
+                    .map_err(|err| RunProcessError::ProcessRuntimeError(err.to_string())),
+    };
 
-    if status.is_none() {
-        p.kill()?;
-        p.wait()?;
+// std::option::Option<
+//     std::result::Result<
+//         std::result::Result<
+//             std::vec::Vec<_>, std::io::Error>,
+//         std::boxed::Box<dyn std::any::Any + std::marker::Send>>>
+
+
+
+    // fn collapse(msg: &str,
+    //             opt_handle: 
+    //                 std::option::Option<
+    //                     std::result::Result<
+    //                         std::result::Result<
+    //                             std::vec::Vec<u8>, std::io::Error>,
+    //                         std::boxed::Box<dyn std::any::Any + std::marker::Send>>>,
+    //             ) -> std::option::Option<std::result::Result<std::vec::Vec<u8>, std::string::String>>
+    //             {
+    //     opt_handle
+    //         .map(|o| 
+    //             o.join()
+    //                 // Convert `std::vec::Vec<_>, std::io::Error`
+    //                 //      to `std::vec::Vec<_>, std::string::String`
+    //                 .map(|i| i.map_err(|err| format!("{} std::io::Error {}", msg, err)))
+    //                 // Convert `std::boxed::Box<dyn std::any::Any + std::marker::Send>`
+    //                 //      to `std::string::String`
+    //                 .map_err(|err| format!("{} thread paniced. Error: {:?}", msg, err))
+    //                 // flatten `Result<Result<_, String>, String>`
+    //                 //      to `Result<_, String>`
+    //                 .and_then(|i| i)
+    //                 )
+    // }
+
+    fn collapse(result:
+                    std::result::Result<
+                        std::result::Result<std::vec::Vec<u8>, std::io::Error>,
+                        std::boxed::Box<dyn std::any::Any + std::marker::Send>>) 
+        -> Result<Vec<u8>, RunProcessError> {
+        
+        match result {
+            Ok(thread_result) => match thread_result { 
+                Ok(read_result) => Ok(read_result),
+                Err(err) => Err(RunProcessError::RedirectReadFailed(err.to_string()))
+            },
+            Err(err) =>
+                //trhead issue
+                Err(RunProcessError::ThreadJoinError(format!("{:?}", err)))
+        }
+    }
+
+    let out = collapse(out_handle.join());
+    // let out = out_handle
+    //     .map(|o| 
+    //         o.join()
+    //             // Convert `std::vec::Vec<_>, std::io::Error`
+    //             //      to `std::vec::Vec<_>, std::string::String`
+    //             .map(|i| i.map_err(|err| format!("std::io::Error {}", err)))
+    //             // Convert `std::boxed::Box<dyn std::any::Any + std::marker::Send>`
+    //             //      to `std::string::String`
+    //             .map_err(|err| format!("stdout thread paniced. Error: {:?}", err))
+    //             // flatten `Result<Result<_, String>, String>`
+    //             //      to `Result<_, String>`
+    //             .and_then(|i| i)
+    //             );
+    // let err = collapse("stderr", err_handle.map(|e| e.join()));
+    let err = collapse(err_handle.join());
+
+// std::option::Option<
+//     std::result::Result<
+//         std::result::Result<
+//             std::vec::Vec<_>, std::io::Error>,
+//         std::boxed::Box<dyn std::any::Any + std::marker::Send>>>
+
+// std::option::Option<
+//     std::result::Result<
+//         std::result::Result<
+//             std::vec::Vec<_>, std::io::Error>, 
+//         std::result::Result<_, std::string::String>>>
+
+
+    // `status == Ok(None)` means a timeout occured
+    if let Ok(st) = status {
+        if st.is_none() {
+            //May not want to error out... As long as we can kill the process then were good.
+            //Maybe log if the process can't be killed??
+            p.kill().map_err(|e| RunProcessError::KillProcessError(e.to_string()))?;
+            p.wait().map_err(|e| RunProcessError::KillWaitError(e.to_string()))?;
+        }
     }
 
     Ok(CapturedData {
-        stdout: out, stderr: err, exit_status: status
+        stdout: out,
+        stderr: err,
+        exit_status: status
     })
-
 }
-
-// #[test]
-// fn test_sleep_with_timeout_works() {
-//     let timeout = Duration::from_millis(5);
-//     let res_data = start_process(timeout, &vec!("sh", "-c", "sleep 5"));
-// }
 
 #[test]
 fn test_sleep_with_timeout_fails() {
@@ -256,67 +343,91 @@ fn test_sleep_with_timeout_fails() {
     }
 
     assert_eq!("hello\n", String::from_utf8(out.unwrap()).unwrap());
+    assert_eq!("", String::from_utf8(err.unwrap()).unwrap());
 }
 
 fn translate_result(
     command: &ExecutableCommand,
-    result: Result<CapturedData, PopenError>)
+    result: Result<CapturedData, RunProcessError>)
     -> CommandResult {
+
+    fn translate_error(err: RunProcessError) -> String {
+        match err {
+            RunProcessError::ProcessCreateError(err) => format!("ProcessCreateError: {}", err),
+            RunProcessError::ProcessRuntimeError(err) => format!("ProcessRuntimeError: {}", err),
+            RunProcessError::RedirectReadFailed(err) => format!("RedirectReadFailed: {}", err),
+            RunProcessError::ThreadJoinError(err) => format!("ThreadJoinError: {}", err),
+            RunProcessError::KillProcessError(err) => format!("KillProcessError: {}", err),
+            RunProcessError::KillWaitError(err) => format!("KillWaitError: {}", err),
+        }
+    }
+
     match result {
         Ok(res) => {
             let stdout = res.stdout
-                .map_or_else(|e| format!("Fcheck Error occured reading stdout. {}", e), 
+                .map_or_else(
+                    |e| format!("Fcheck error on stdout. {}", translate_error(e)), 
                     |v| from_utf8_lossy(v));
             let stderr = res.stderr
-                .map_or_else(|e| format!("Fcheck Error occured reading stderr. {}", e), 
+                .map_or_else(
+                    |e| format!("Fcheck error on stderr. {}", translate_error(e)), 
                     |v| from_utf8_lossy(v));
             match res.exit_status {
-                Some(exit_status) => match exit_status {
-                    // https://docs.rs/subprocess/0.1.18/subprocess/enum.ExitStatus.html
-                    ExitStatus::Exited(s) => {
-                        CommandResult::StandardResult {
+                Ok(opt_exit_status) => match opt_exit_status {
+                    Some(exit_status) => match exit_status {
+                        // https://docs.rs/subprocess/0.1.18/subprocess/enum.ExitStatus.html
+                        ExitStatus::Exited(s) => {
+                            CommandResult::StandardResult {
+                                command: command.clone(),
+                                stdout: stdout,
+                                stderr: stderr,
+                                exit_code: s.to_owned(),
+                            }
+                        },
+                        ExitStatus::Signaled(s) =>
+                            CommandResult::IrregularExitCode {
+                                command: command.clone(),
+                                stdout: stdout,
+                                stderr: stderr,
+                                exit_code: format!("Signaled({})", s),
+                            },
+                        ExitStatus::Other(s) =>
+                            CommandResult::IrregularExitCode {
+                                command: command.clone(),
+                                stdout: stdout,
+                                stderr: stderr,
+                                exit_code: format!("Other({})", s),
+                            },
+                        ExitStatus::Undetermined => 
+                            CommandResult::IrregularExitCode {
+                                command: command.clone(),
+                                stdout: stdout,
+                                stderr: stderr,
+                                exit_code: "Undetermined".to_string(),
+                            },
+                    },
+                    None => {
+                        //Timeout Occurred
+                        CommandResult::Timeout {
                             command: command.clone(),
                             stdout: stdout,
                             stderr: stderr,
-                            exit_code: s.to_owned(),
                         }
                     },
-                    ExitStatus::Signaled(s) =>
-                        CommandResult::IrregularExitCode {
-                            command: command.clone(),
-                            stdout: stdout,
-                            stderr: stderr,
-                            exit_code: format!("Signaled({})", s),
-                        },
-                    ExitStatus::Other(s) =>
-                        CommandResult::IrregularExitCode {
-                            command: command.clone(),
-                            stdout: stdout,
-                            stderr: stderr,
-                            exit_code: format!("Other({})", s),
-                        },
-                    ExitStatus::Undetermined => 
-                        CommandResult::IrregularExitCode {
-                            command: command.clone(),
-                            stdout: stdout,
-                            stderr: stderr,
-                            exit_code: "Undetermined".to_string(),
-                        },
                 },
-                None => {
-                    //Timeout Occurred
-                    CommandResult::Timeout {
+                Err(err) => 
+                    CommandResult::RuntimeError {
                         command: command.clone(),
                         stdout: stdout,
                         stderr: stderr,
-                    }
-                },
+                        error: format!("Runtime error occured: {}", translate_error(err)),
+                    },
             }
         },
         Err(e) => 
             CommandResult::OsError {
                 command: command.clone(),
-                error: format!("OS error occured: {}", e),
+                error: format!("OS error occured: {}", translate_error(e)),
             }
     }
 }
@@ -330,6 +441,8 @@ fn t_exec_simple() {
     let cmd = ExecutableCommand {
         name: Option::None,
         description: Option::None,
+        timeout: None,
+        shell: Shell::default(),
         cmd: "echo Hello".to_string(),
     };
 
@@ -351,6 +464,8 @@ fn t_exec_multiline() {
     let cmd = ExecutableCommand {
         name: Option::None,
         description: Option::None,
+        timeout: None,
+        shell: Shell::default(),
         cmd: r#"
             echo Hello;
             echo hello;
@@ -375,6 +490,8 @@ fn t_exec_runs_with_bash() {
     let cmd = ExecutableCommand {
         name: Option::None,
         description: Option::None,
+        timeout: None,
+        shell: Shell::default(),
         cmd: r#"
             for (( i=0; i < 3; i++));
             do
@@ -405,11 +522,15 @@ fn t_execset_simple() {
             ExecutableCommand {
                 name: Option::None,
                 description: Option::None,
+                timeout: None,
+                shell: Shell::default(),
                 cmd: "echo Hello".to_string(),
             },
             ExecutableCommand {
                 name: Option::None,
                 description: Option::None,
+                timeout: None,
+                shell: Shell::default(),
                 cmd: "echo Hello".to_string(),
             },
         ),
@@ -430,11 +551,15 @@ fn t_execset_stop_on_failure() {
             ExecutableCommand {
                 name: Option::None,
                 description: Option::None,
+                timeout: None,
+                shell: Shell::default(),
                 cmd: "exit 1".to_string(),
             },
             ExecutableCommand {
                 name: Option::None,
                 description: Option::None,
+                timeout: None,
+                shell: Shell::default(),
                 cmd: "echo Hello".to_string(),
             },
         ),

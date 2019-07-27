@@ -45,6 +45,14 @@ pub enum CommandOutput {
         result: String,
         error: String,
     },
+    RuntimeError {
+        name: Option<String>,
+        command: String,
+        result: String,
+        stdout: String,
+        stderr: String,
+        error: String,
+    },
     Timeout {
         name: Option<String>,
         command: String,
@@ -106,6 +114,14 @@ fn map_command(res: &CommandResult) -> CommandOutput {
             name: command.name.clone(),
             command: command.cmd.clone(),
             result: result,
+            error: error.clone(),
+        },
+        CommandResult::RuntimeError {command, stdout, stderr, error} => CommandOutput::RuntimeError {
+            name: command.name.clone(),
+            command: command.cmd.clone(),
+            result: result,
+            stdout: stdout.clone(),
+            stderr: stderr.clone(),
             error: error.clone(),
         },
         CommandResult::Timeout {command, stdout, stderr} => CommandOutput::Timeout {

@@ -1,5 +1,14 @@
 #[derive(Debug, PartialEq, Clone)]
+pub struct Shell(pub String, pub Vec<String>);
+impl Default for Shell {
+    fn default() -> Shell {
+        Shell("/bin/bash".to_string(), vec!("-c".to_string()))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct ProcessingModule {
+    pub shell: Shell,
     pub setup: CommandSet,
     pub tests: CommandFamily,
     pub teardown: CommandSet,
@@ -36,6 +45,8 @@ pub struct CommandSet {
 pub struct ExecutableCommand {
     pub name: Option<String>,
     pub description: Option<String>,
+    pub timeout: Option<u64>,
+    pub shell: Shell,
     pub cmd: String,
 }
 
@@ -87,6 +98,12 @@ pub enum CommandResult {
         command: ExecutableCommand,
         error: String,
     },
+    RuntimeError {
+        command: ExecutableCommand,
+        stdout: String,
+        stderr: String,
+        error: String,
+    },
     Timeout {
         command: ExecutableCommand,
         stdout: String,
@@ -109,6 +126,7 @@ impl CommandResult {
     pub fn success(&self) -> bool {
         match self {
             CommandResult::OsError{command: _, error: _} => false,
+            CommandResult::RuntimeError{command: _, stdout: _, stderr: _, error: _} => false,
             CommandResult::Timeout{command: _, stdout: _, stderr: _} => false,
             CommandResult::IrregularExitCode{command: _, stdout: _, stderr: _, exit_code: _} => false,
             CommandResult::StandardResult{command: _, stdout: _, stderr: _, exit_code} => exit_code.eq(&0),
