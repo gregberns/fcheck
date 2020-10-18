@@ -287,9 +287,16 @@ To run in docker:
 docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fcheck -c ./examples/config.toml -r ./data/report.json
 ```
 
-### Rust
+### High Priority Tasks
 
-```bash
-cargo build
-cargo run -- -c ./config/config-v3.toml
-```
+* Bug: fcheck returning exit code 0, event though tests have failed
+
+### Other Tasks
+
+* Add support for other shells: bash, zsh. This will allow support in Alpine.
+* Handle all warnings, code cleanup
+* Add version to binary based on VERSION file
+* Make output report readable
+* Add examples
+* Compile to different docker container bases
+* Add Dhall support

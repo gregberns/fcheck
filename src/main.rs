@@ -49,6 +49,7 @@ fn main() {
                 .short("r")
                 .long("report-file")
                 .help("File name of output report")
+                .takes_value(true)
                 .required(false),
         )
         // .arg(Arg::with_name("v")
@@ -111,6 +112,12 @@ fn main() {
         "Run results report written to: {}",
         output_report_path.display()
     );
+
+    if res.success() {
+        std::process::exit(0)
+    } else {
+        std::process::exit(1)
+    }
 }
 
 fn get_extension_from_filename(filename: &str) -> Option<&str> {

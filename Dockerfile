@@ -1,4 +1,4 @@
-FROM clux/muslrust as build
+FROM clux/muslrust:nightly-2020-10-17 as build
 
 WORKDIR /build
 COPY Cargo.toml Cargo.lock /build/
@@ -29,7 +29,7 @@ RUN mkdir /fcheck/config &&\
     mkdir /fcheck/data &&\
     mkdir /fcheck/output
 
-COPY --from=build /build/target/x86_64-unknown-linux-musl/release/fcheck /app
+COPY --from=build /build/target/x86_64-unknown-linux-musl/release/fcheck /bin
 
 CMD ["./fcheck"]
 
@@ -51,6 +51,6 @@ RUN mkdir /fcheck/config &&\
     mkdir /fcheck/data &&\
     mkdir /fcheck/output
 
-COPY --from=build /build/target/x86_64-unknown-linux-musl/release/fcheck /app
+COPY --from=build /build/target/x86_64-unknown-linux-musl/release/fcheck /bin
 
 CMD ["./fcheck"]

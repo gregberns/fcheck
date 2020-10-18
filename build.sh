@@ -9,11 +9,11 @@ echo "Start Build"
 docker build --target alpine -t $TAG . || exit $?
 echo "End Build"
 
-source_path=/app
-destination_path=./bin/$VERSION/fcheck
+source_path=/bin/fcheck
+destination_dir=./bin/$VERSION
 
-mkdir -p $destination_path
+mkdir -p $destination_dir
 
 container_id=$(docker create $TAG)
-docker cp $container_id:$source_path $destination_path
+docker cp $container_id:$source_path $destination_dir
 docker rm $container_id
