@@ -1,3 +1,11 @@
+bin
+test/actual
+
+/target
+/test_input
+/test_output
+/output
+
 data/
 config/
 
