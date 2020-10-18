@@ -1,0 +1,27 @@
+version = "3"
+
+[[setup]]
+command = "rm -f ./*"
+[[setup]]
+command = "echo Starting"
+
+[[test]]
+name = "Test 1"
+[[test.command]]
+name = "Print message to file"
+command = "echo dogs > /actual/dogs.txt"
+[[test.command]]
+name = "Validate contents of file"
+command = "wdiff /expected/dogs.txt /actual/dogs.txt"
+
+[[test]]
+name = "Test 2"
+[[test.command]]
+name = "Print message to file"
+command = "echo cats > /actual/cats.txt"
+[[test.command]]
+name = "Validate contents of file"
+command = "wdiff /expected/cats.txt /actual/cats.txt"
+
+[[teardown]]
+command = "echo Finished"

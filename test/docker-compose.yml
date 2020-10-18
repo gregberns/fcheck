@@ -1,0 +1,10 @@
+version: '3.7'
+
+services:
+  fcheck:
+    build: 
+      context: ..
+      dockerfile: ./test/Dockerfile_fcheck
+    volumes:
+      - ./actual:/actual
+      - ./expected:/expected:ro
