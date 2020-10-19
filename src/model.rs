@@ -2,7 +2,7 @@
 pub struct Shell(pub String, pub Vec<String>);
 impl Default for Shell {
     fn default() -> Shell {
-        Shell("/bin/bash".to_string(), vec!("-c".to_string()))
+        Shell("/bin/bash".to_string(), vec!["-c".to_string()])
     }
 }
 
@@ -54,12 +54,18 @@ pub struct ExecutableCommand {
 pub struct ProcessingModuleResult {
     pub module: ProcessingModule,
     pub setup: CommandSetResult,
-    pub tests: CommandFamilyResult,
-    pub teardown: CommandSetResult,
+    pub tests: Option<CommandFamilyResult>,
+    pub teardown: Option<CommandSetResult>,
 }
 impl ProcessingModuleResult {
     pub fn success(&self) -> bool {
-        self.setup.success() && self.tests.success() && self.teardown.success()
+        self.setup.success()
+            // Check that tests was Some and .success() is true
+            && self.tests.is_some()
+            && self.tests.clone().map(|t| t.success()).unwrap_or(false)
+            // Check that teardown was Some and .success() is true
+            && self.teardown.is_some()
+            && self.teardown.clone().map(|t| t.success()).unwrap_or(false)
     }
 }
 
@@ -118,11 +124,33 @@ pub enum CommandResult {
 impl CommandResult {
     pub fn success(&self) -> bool {
         match self {
-            CommandResult::OsError{command: _, error: _} => false,
-            CommandResult::RuntimeError{command: _, stdout: _, stderr: _, error: _} => false,
-            CommandResult::Timeout{command: _, stdout: _, stderr: _} => false,
-            CommandResult::IrregularExitCode{command: _, stdout: _, stderr: _, exit_code: _} => false,
-            CommandResult::StandardResult{command: _, stdout: _, stderr: _, exit_code} => exit_code.eq(&0),
+            CommandResult::OsError {
+                command: _,
+                error: _,
+            } => false,
+            CommandResult::RuntimeError {
+                command: _,
+                stdout: _,
+                stderr: _,
+                error: _,
+            } => false,
+            CommandResult::Timeout {
+                command: _,
+                stdout: _,
+                stderr: _,
+            } => false,
+            CommandResult::IrregularExitCode {
+                command: _,
+                stdout: _,
+                stderr: _,
+                exit_code: _,
+            } => false,
+            CommandResult::StandardResult {
+                command: _,
+                stdout: _,
+                stderr: _,
+                exit_code,
+            } => exit_code.eq(&0),
         }
     }
 }

@@ -1,0 +1,14 @@
+version: '3.7'
+
+services:
+  fcheck:
+    build: .
+    volumes:
+      # Config is for the `fcheck-config.toml` file
+      - ./config:/config
+      # The expected directory is used for files to diff against the output
+      - ./expected:/expected:ro
+
+      - ./actual:/actual
+      # The output directory can be used for the output report
+      - ./output:/output

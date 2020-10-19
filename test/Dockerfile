@@ -10,6 +10,5 @@ RUN apt-get update &&\
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY ./bin/fcheck /bin
-COPY ./fcheck-config.toml /bin/fcheck-config.toml
 
-CMD ["/bin/fcheck", "--config-file", "/bin/fcheck-config.toml", "--report-file", "/output/report.json"]
+CMD ["/bin/fcheck", "--config-file", "/config/config.toml", "--report-file", "/output/report.json"]

@@ -8,14 +8,14 @@ use crate::model::{
     CommandSetResult,
     // CommandFamilyResult,
     ProcessingModuleResult,
-    };
+};
 
 #[derive(Serialize, Debug)]
 pub struct ModuleOutput {
     result: String,
     setup: Vec<CommandOutput>,
-    tests: Vec<TestOutput>,
-    teardown: Vec<CommandOutput>,
+    tests: Option<Vec<TestOutput>>,
+    teardown: Option<Vec<CommandOutput>>,
 }
 
 #[derive(Serialize, Debug)]
@@ -73,15 +73,25 @@ pub fn format_module(module: &ProcessingModuleResult) -> String {
 }
 
 fn result_to_string(b: bool) -> String {
-    if b { "success".to_string() } else { "failure".to_string() }
+    if b {
+        "success".to_string()
+    } else {
+        "failure".to_string()
+    }
 }
 
 fn map_module(module: &ProcessingModuleResult) -> ModuleOutput {
     ModuleOutput {
         result: result_to_string(module.success()),
         setup: module.setup.results.iter().map(map_command).collect(),
-        tests: module.tests.sets.iter().map(map_test).collect(),
-        teardown: module.teardown.results.iter().map(map_command).collect(),
+        tests: module
+            .tests
+            .clone()
+            .map(|t| t.sets.iter().map(map_test).collect()),
+        teardown: module
+            .teardown
+            .clone()
+            .map(|t| t.results.iter().map(map_command).collect()),
     }
 }
 
@@ -97,13 +107,18 @@ fn map_command(res: &CommandResult) -> CommandOutput {
     let result = result_to_string(res.success());
 
     match res {
-        CommandResult::OsError {command, error} => CommandOutput::OsError {
+        CommandResult::OsError { command, error } => CommandOutput::OsError {
             name: command.name.clone(),
             command: command.cmd.clone(),
             result: result,
             error: error.clone(),
         },
-        CommandResult::RuntimeError {command, stdout, stderr, error} => CommandOutput::RuntimeError {
+        CommandResult::RuntimeError {
+            command,
+            stdout,
+            stderr,
+            error,
+        } => CommandOutput::RuntimeError {
             name: command.name.clone(),
             command: command.cmd.clone(),
             result: result,
@@ -111,14 +126,23 @@ fn map_command(res: &CommandResult) -> CommandOutput {
             stderr: stderr.clone(),
             error: error.clone(),
         },
-        CommandResult::Timeout {command, stdout, stderr} => CommandOutput::Timeout {
+        CommandResult::Timeout {
+            command,
+            stdout,
+            stderr,
+        } => CommandOutput::Timeout {
             name: command.name.clone(),
             command: command.cmd.clone(),
             result: result,
             stdout: stdout.clone(),
             stderr: stderr.clone(),
         },
-        CommandResult::IrregularExitCode {command, stdout, stderr, exit_code} => CommandOutput::IrregularExitCode {
+        CommandResult::IrregularExitCode {
+            command,
+            stdout,
+            stderr,
+            exit_code,
+        } => CommandOutput::IrregularExitCode {
             name: command.name.clone(),
             command: command.cmd.clone(),
             result: result,
@@ -126,7 +150,12 @@ fn map_command(res: &CommandResult) -> CommandOutput {
             stderr: stderr.clone(),
             exit_code: exit_code.clone(),
         },
-        CommandResult::StandardResult {command, stdout, stderr, exit_code} => CommandOutput::Complete {
+        CommandResult::StandardResult {
+            command,
+            stdout,
+            stderr,
+            exit_code,
+        } => CommandOutput::Complete {
             name: command.name.clone(),
             command: command.cmd.clone(),
             result: result,
@@ -138,6 +167,5 @@ fn map_command(res: &CommandResult) -> CommandOutput {
 }
 
 pub fn to_json(module: &ModuleOutput) -> String {
-    serde_json::to_string_pretty(module)
-      .expect("Failed to serialize string")
+    serde_json::to_string_pretty(module).expect("Failed to serialize string")
 }

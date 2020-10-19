@@ -2,17 +2,22 @@
 
 set -e
 
-VERSION=$(cat ../version)
+# VERSION=$(cat ../version)
 
-mkdir -p ./bin
-cp ../bin/$VERSION/fcheck ./bin/fcheck
+# mkdir -p ./bin
+# cp ../bin/$VERSION/fcheck ./bin/fcheck
 
-docker-compose build
+# docker-compose build
 
-rm -rf ./actual/*
-rm -rf ./output/*
+# rm -rf ./actual/*
+# rm -rf ./output/*
+
+rm -rf ./config/*
+cp ./test-01-config.toml ./config/config.toml
 
 docker-compose up --exit-code-from fcheck || (echo "docker-compose failed" && exit 1)
+
+cp ./output/report.json ./output/report-01.json
 
 if [[ ! -f "./actual/dogs.txt" ]]; then
     echo "./actual/dogs.txt is missing"
@@ -32,15 +37,13 @@ if [ $(cat ./expected/cats.txt) != "cats" ]; then
     exit 1
 fi
 
-if [[ ! -f "./output/report.json" ]]; then
-    echo "./output/report.json is missing"
+if [[ ! -f "./output/report-01.json" ]]; then
+    echo "./output/report-01.json is missing"
     exit 1
 fi
 # Check that the output report is correct - with jq
-OUT_REQ=$(cat output/report.json | jq -r .result)
+OUT_REQ=$(cat output/report-01.json | jq -r .result)
 if [[ $OUT_REQ != "success" ]]; then
-    echo "./output/report.json .result should be success"
+    echo "./output/report-01.json .result should be success"
     exit 1
 fi
-
-echo "Tests Successful. Push to Prod."
