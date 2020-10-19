@@ -14,23 +14,6 @@ use output_formatter::format_module;
 use parser::{file_extension_to_filetype, prepare_file};
 use processor::run;
 
-/// To Do:
-/// ~~Add full success of module~~
-/// * Compile to different docker container bases
-/// * Check if the system has bash - if not revert to sh
-/// * Tests, Tests, Tests
-///     * Use bash scripts? Rust? Could have rust tests run, execute the binary with a toml file
-///     * Diff the JSON output
-///         * Test 1 - Script that has startup, test, teardown
-///         * Test 2 - Script missing
-///         * Test 3 - Timeout
-/// * Timeouts
-///     * 0 should be 'no timeout'
-///     * Pass timeouts from config
-/// * Pass in default shell
-/// * Stop early if Setup fails
-/// * Add module name
-
 fn main() {
     let matches = App::new("fcheck")
         .version("0.3.0")

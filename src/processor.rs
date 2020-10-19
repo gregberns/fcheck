@@ -32,35 +32,35 @@ pub fn run(module: &ProcessingModule) -> ProcessingModuleResult {
 }
 
 pub fn run_processingmodule(
-    run_cmd: &Fn(&ExecutableCommand) -> CommandResult,
+    run_cmd: &dyn Fn(&ExecutableCommand) -> CommandResult,
     module: &ProcessingModule,
 ) -> ProcessingModuleResult {
     let setup = run_commandset(true, &run_cmd, &module.setup);
     //Need ability to exit if there was a failure
     // StopOnSetupFailure = true && !setup.success()
-    // if !setup.success() {
-    //     ProcessingModuleResult {
-    //         module: module.clone(),
-    //         setup: setup,
-    //         tests: None,
-    //         teardown: None,
-    //     }
-    // }
+    if setup.success() {
+        let tests = run_commandfamily(&run_cmd, &module.tests);
 
-    let tests = run_commandfamily(&run_cmd, &module.tests);
+        let teardown = run_commandset(false, &run_cmd, &module.teardown);
 
-    let teardown = run_commandset(false, &run_cmd, &module.teardown);
-
-    ProcessingModuleResult {
-        module: module.clone(),
-        setup: setup,
-        tests: tests,
-        teardown: teardown,
+        ProcessingModuleResult {
+            module: module.clone(),
+            setup: setup,
+            tests: Some(tests),
+            teardown: Some(teardown),
+        }
+    } else {
+        ProcessingModuleResult {
+            module: module.clone(),
+            setup: setup,
+            tests: None,
+            teardown: None,
+        }
     }
 }
 
 pub fn run_commandfamily(
-    run_cmd: &Fn(&ExecutableCommand) -> CommandResult,
+    run_cmd: &dyn Fn(&ExecutableCommand) -> CommandResult,
     family: &CommandFamily,
 ) -> CommandFamilyResult {
     let mut results = Vec::new();
@@ -77,7 +77,7 @@ pub fn run_commandfamily(
 
 pub fn run_commandset(
     stop_on_failure: bool,
-    run_cmd: &Fn(&ExecutableCommand) -> CommandResult,
+    run_cmd: &dyn Fn(&ExecutableCommand) -> CommandResult,
     set: &CommandSet,
 ) -> CommandSetResult {
     let mut results = Vec::new();
@@ -114,8 +114,13 @@ struct CapturedData {
     exit_status: Result<Option<ExitStatus>, RunProcessError>,
 }
 
+#[derive(Debug)]
 pub enum RunProcessError {
-    // ProcessCreateError - PopenConfig::create error - If the external program cannot be executed for any reason, an error is returned. The most typical reason for execution to fail is that the program is missing on the PATH, but other errors are also possible. Note that this is distinct from the program running and then exiting with a failure code - this can be detected by calling the wait method to obtain its exit status.
+    // ProcessCreateError - PopenConfig::create error - If the external program cannot
+    // be executed for any reason, an error is returned. The most typical reason for execution
+    // to fail is that the program is missing on the PATH, but other errors are also possible.
+    //  Note that this is distinct from the program running and then exiting with a failure
+    // code - this can be detected by calling the wait method to obtain its exit status.
     ProcessCreateError(String),
     // Error from `wait_timeout` or `wait`
     ProcessRuntimeError(String),
@@ -123,7 +128,7 @@ pub enum RunProcessError {
     RedirectReadFailed(String),
     // Error when `thread.join()` called
     ThreadJoinError(String),
-    //Fail to Kill process
+    // Fail to Kill process
     KillProcessError(String),
     KillWaitError(String),
 }
@@ -132,6 +137,11 @@ fn start_process<S: AsRef<OsStr>>(
     timeout: Option<Duration>,
     args: &[S],
 ) -> Result<CapturedData, RunProcessError> {
+    // let args_str = args.iter().fold(String::new(), |agg, i| {
+    //     format!("{:?}, {:?}", agg, i.as_ref().to_os_string())
+    // });
+    // println!("Start Process = agrs: {:?}", args_str);
+
     let mut p = Popen::create(
         args,
         PopenConfig {
@@ -201,6 +211,8 @@ fn start_process<S: AsRef<OsStr>>(
                 .map_err(|e| RunProcessError::KillWaitError(e.to_string()))?;
         }
     }
+
+    // println!("Command Result: {:?}, {:?}, {:?}", out, err, status);
 
     Ok(CapturedData {
         stdout: out,

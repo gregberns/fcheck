@@ -3,10 +3,10 @@
 VERSION=$(cat version)
 echo $VERSION
 
-TAG=fcheck:alpine-$VERSION
+TAG=fcheck:debian-stretch-$VERSION
 
 echo "Start Build"
-docker build --target alpine -t $TAG . || exit $?
+docker build --target debian-stretch -t $TAG . || exit $?
 echo "End Build"
 
 source_path=/bin/fcheck

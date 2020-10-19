@@ -289,14 +289,27 @@ docker run -v ${PWD}/config/:/fcheck/config/ -v ${PWD}/data/:/fcheck/data/ fchec
 
 ### High Priority Tasks
 
-* Bug: fcheck returning exit code 0, event though tests have failed
+* Example of copying the binary into external project
+* Stop early if Setup fails
 
 ### Other Tasks
 
 * Add support for other shells: bash, zsh. This will allow support in Alpine.
+  * Check if the system has bash - if not revert to sh
 * Handle all warnings, code cleanup
 * Add version to binary based on VERSION file
 * Make output report readable
 * Add examples
-* Compile to different docker container bases
 * Add Dhall support
+* Compile to different docker container bases
+* Tests, Tests, Tests
+  * Use bash scripts? Rust? Could have rust tests run, execute the binary with a toml file
+  * Diff the JSON output
+    * Test 1 - Script that has startup, test, teardown
+    * Test 2 - Script missing
+    * Test 3 - Timeout
+* Timeouts
+  * 0 should be 'no timeout'
+  * Pass timeouts from config
+* Pass in default shell
+* Add module name

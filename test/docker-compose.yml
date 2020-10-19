@@ -2,10 +2,11 @@ version: '3.7'
 
 services:
   fcheck:
-    build: 
-      context: .
-      dockerfile: ./Dockerfile
+    build: .
     volumes:
       - ./actual:/actual
       - ./expected:/expected:ro
       - ./output:/output
+      # Careful here... don't mount to /bin directly
+      - ./bin/fcheck:/bin/fcheck
+      - ./config:/config
